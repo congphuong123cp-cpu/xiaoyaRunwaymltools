@@ -1,0 +1,1599 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>小鸭快跑RunwayML视频插件</title>
+  <link rel="stylesheet" href="../../../plugin-sdk.css">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-gradient: radial-gradient(circle at 80% 20%, #170d3a 0%, #070513 100%);
+      --card-bg: rgba(22, 18, 44, 0.65);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --accent-purple: #8338ec;
+      --accent-purple-glow: rgba(131, 56, 236, 0.4);
+      --accent-cyan: #00f5d4;
+      --accent-cyan-glow: rgba(0, 245, 212, 0.4);
+      --accent-pink: #f72585;
+      --accent-pink-glow: rgba(247, 37, 133, 0.4);
+      --text-primary: #f8f9fa;
+      --text-secondary: #a2a7a9;
+      --text-muted: #5c6266;
+      --input-bg: rgba(7, 5, 18, 0.85);
+      --input-border: rgba(255, 255, 255, 0.12);
+    }
+
+    body {
+      margin: 0;
+      padding: 14px;
+      background: var(--bg-gradient);
+      font-family: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text-primary);
+      min-height: 100vh;
+      box-sizing: border-box;
+    }
+
+    /* Scrollbar Styling */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.1);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+
+    /* Glassmorphism Card */
+    .card {
+      background: var(--card-bg);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 10px;
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      padding-bottom: 8px;
+    }
+
+    .card-header h3 {
+      margin: 0;
+      font-size: 15.5px;
+      font-weight: 600;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Headers */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .header-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .header-logo {
+      height: 48px;
+      width: 48px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      background-color: rgba(255, 255, 255, 0.05);
+    }
+
+    .header-title h1 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      background: linear-gradient(135deg, #fff 30%, #a29bfe 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .header-title p {
+      margin: 2px 0 0 0;
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+
+    /* Tabs Layout */
+    .tabs-container {
+      display: flex;
+      gap: 4px;
+      background: rgba(0, 0, 0, 0.3);
+      padding: 4px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      margin-bottom: 16px;
+      overflow-x: auto;
+      scroll-behavior: smooth;
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      padding: 6px 12px;
+      font-size: 14px;
+      font-weight: 500;
+      border-radius: 6px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.25s ease;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .tab-btn:hover {
+      color: #fff;
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .tab-btn.active {
+      color: #fff;
+      background: var(--accent-purple);
+      box-shadow: 0 0 10px var(--accent-purple-glow);
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+      animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Metric Grid */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+
+    .metric-card {
+      background: rgba(8, 6, 20, 0.4);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 6px 4px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+      transition: all 0.3s ease;
+    }
+
+    .metric-card:hover {
+      border-color: rgba(255, 255, 255, 0.15);
+      background: rgba(8, 6, 20, 0.6);
+    }
+
+    .metric-card .title {
+      font-size: 11.5px;
+      color: var(--text-secondary);
+      margin-bottom: 2px;
+    }
+
+    .metric-card .value {
+      font-size: 16px;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .metric-card.cyan-glow .value {
+      color: var(--accent-cyan);
+      text-shadow: 0 0 6px var(--accent-cyan-glow);
+    }
+
+    .metric-card.purple-glow .value {
+      color: #b388ff;
+      text-shadow: 0 0 6px rgba(179, 136, 255, 0.4);
+    }
+
+    .metric-card.green-glow .value {
+      color: #00e676;
+      text-shadow: 0 0 6px rgba(0, 230, 118, 0.4);
+    }
+
+    .metric-card.red-glow .value {
+      color: #ff5252;
+      text-shadow: 0 0 6px rgba(255, 82, 82, 0.4);
+    }
+
+    /* Forms */
+    .form-row {
+      margin-bottom: 8px;
+    }
+
+    .form-row label {
+      display: block;
+      font-size: 13.5px;
+      color: var(--text-secondary);
+      margin-bottom: 5px;
+      font-weight: 500;
+    }
+
+    .form-row-inline {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .input-group {
+      display: flex;
+      gap: 6px;
+    }
+
+    .input-group input {
+      flex: 1;
+    }
+
+    input[type="text"], input[type="number"], input[type="password"], select, textarea {
+      width: 100%;
+      padding: 6px 8px;
+      background: var(--input-bg);
+      border: 1px solid var(--input-border);
+      border-radius: 6px;
+      color: #fff;
+      font-size: 13.5px;
+      outline: none;
+      box-sizing: border-box;
+      transition: all 0.25s ease;
+      font-family: inherit;
+    }
+
+    input[type="text"]:focus, input[type="number"]:focus, input[type="password"]:focus, select:focus, textarea:focus {
+      border-color: var(--accent-purple);
+      box-shadow: 0 0 8px var(--accent-purple-glow);
+      background: rgba(12, 8, 30, 0.95);
+    }
+
+    textarea {
+      resize: vertical;
+    }
+
+    /* Switch Component */
+    .switch-container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 4px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    }
+
+    .switch-label {
+      font-size: 13.5px;
+      color: var(--text-secondary);
+    }
+
+    .switch-label p {
+      margin: 2px 0 0 0;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 38px;
+      height: 20px;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: rgba(255, 255, 255, 0.1);
+      transition: .3s;
+      border-radius: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 14px;
+      width: 14px;
+      left: 2px;
+      bottom: 2px;
+      background-color: #a2a7a9;
+      transition: .3s;
+      border-radius: 50%;
+    }
+
+    input:checked + .slider {
+      background-color: var(--accent-purple);
+      border-color: var(--accent-purple);
+      box-shadow: 0 0 8px var(--accent-purple-glow);
+    }
+
+    input:checked + .slider:before {
+      transform: translateX(18px);
+      background-color: #fff;
+    }
+
+    /* Modern Table */
+    .table-container {
+      overflow-x: auto;
+      margin-top: 8px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+    }
+
+    th, td {
+      padding: 8px 10px;
+      font-size: 13px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    }
+
+    th {
+      background: rgba(0, 0, 0, 0.25);
+      color: var(--text-secondary);
+      font-weight: 600;
+      letter-spacing: 0.3px;
+    }
+
+    td {
+      color: var(--text-primary);
+    }
+
+    tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    /* Badges */
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .status-badge.success {
+      background: rgba(0, 245, 212, 0.12);
+      color: var(--accent-cyan);
+      border: 1px solid rgba(0, 245, 212, 0.2);
+    }
+
+    .status-badge.danger {
+      background: rgba(247, 37, 133, 0.12);
+      color: var(--accent-pink);
+      border: 1px solid rgba(247, 37, 133, 0.2);
+    }
+
+    .status-badge.warning {
+      background: rgba(255, 179, 0, 0.12);
+      color: #ffb300;
+      border: 1px solid rgba(255, 179, 0, 0.2);
+    }
+
+    /* Buttons */
+    button {
+      background: var(--accent-purple);
+      border: none;
+      color: #fff;
+      padding: 6px 12px;
+      font-size: 13.5px;
+      font-weight: 600;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+    }
+
+    button:hover {
+      opacity: 0.95;
+      transform: translateY(-1px);
+      box-shadow: 0 6px 15px rgba(131, 56, 236, 0.3);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    button.btn-secondary {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-primary);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      box-shadow: none;
+    }
+
+    button.btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.15);
+      box-shadow: none;
+    }
+
+    button.btn-danger {
+      background: var(--accent-pink);
+      box-shadow: 0 4px 10px rgba(247, 37, 133, 0.2);
+    }
+
+    button.btn-danger:hover {
+      box-shadow: 0 6px 15px rgba(247, 37, 133, 0.35);
+    }
+
+    button.btn-success {
+      background: var(--accent-cyan);
+      color: #050414;
+      box-shadow: 0 4px 10px rgba(0, 245, 212, 0.2);
+    }
+
+    button.btn-success:hover {
+      box-shadow: 0 6px 15px rgba(0, 245, 212, 0.35);
+    }
+
+    button.btn-icon {
+      padding: 6px;
+      border-radius: 4px;
+    }
+
+    button:disabled {
+      opacity: 0.4 !important;
+      cursor: not-allowed !important;
+      transform: none !important;
+      box-shadow: none !important;
+    }
+
+    /* Terminal Console */
+    .terminal-container {
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--card-border);
+      margin-top: 14px;
+    }
+
+    .terminal-header {
+      background: rgba(0,0,0,0.4);
+      padding: 8px 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+    }
+
+    .terminal-title {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+
+    .terminal-pulse {
+      width: 6px;
+      height: 6px;
+      background-color: var(--accent-cyan);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--accent-cyan-glow);
+      animation: pulsePulse 1.5s infinite;
+    }
+
+    @keyframes pulsePulse {
+      0% { opacity: 0.4; }
+      50% { opacity: 1; }
+      100% { opacity: 0.4; }
+    }
+
+    .terminal-body {
+      background: #03020a;
+      padding: 12px;
+      font-family: 'JetBrains Mono', Consolas, monospace;
+      font-size: 10px;
+      color: #a5b4fc;
+      height: 170px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+      line-height: 1.5;
+    }
+
+    /* License Panel Styling */
+    .lic-info-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+      font-size: 12px;
+    }
+
+    .lic-info-key {
+      color: var(--text-secondary);
+    }
+
+    .lic-info-val {
+      font-weight: 500;
+      color: #fff;
+    }
+
+    .lic-code-box {
+      font-family: 'JetBrains Mono', Consolas, monospace;
+      background: rgba(0,0,0,0.3);
+      padding: 8px;
+      border-radius: 6px;
+      border: 1px solid rgba(255,255,255,0.06);
+      font-size: 11px;
+      color: #818cf8;
+      word-break: break-all;
+      margin-top: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* Modal / Alert dialog overlay */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.8);
+      z-index: 1000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      backdrop-filter: blur(4px);
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal-box {
+      background: #0f0b24;
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 12px;
+      max-width: 480px;
+      width: 100%;
+      padding: 20px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+      animation: modalSlide 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+    }
+
+    @keyframes modalSlide {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    .modal-header h4 {
+      margin: 0 0 10px 0;
+      font-size: 14px;
+      color: #fff;
+    }
+
+    .modal-body {
+      font-size: 12px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+      white-space: pre-wrap;
+      max-height: 250px;
+      overflow-y: auto;
+      background: rgba(0,0,0,0.25);
+      padding: 10px;
+      border-radius: 6px;
+      border: 1px solid rgba(255,255,255,0.05);
+      font-family: 'JetBrains Mono', Consolas, monospace;
+    }
+
+    .modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 14px;
+    }
+
+    /* Toast Notification */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: rgba(12, 8, 30, 0.95);
+      border: 1px solid var(--accent-purple);
+      padding: 10px 20px;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 500;
+      z-index: 2000;
+      opacity: 0;
+      transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+      pointer-events: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .toast.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+
+    .toast.success { border-color: var(--accent-cyan); }
+    .toast.error { border-color: var(--accent-pink); }
+
+    .hint-text {
+      font-size: 12.5px;
+      color: var(--text-muted);
+      margin-top: 4px;
+      line-height: 1.4;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Header -->
+  <div class="header">
+    <div class="header-title">
+      <img src="duck.png" alt="小鸭" class="header-logo">
+      <div>
+        <h1>小鸭快跑RunwayML视频插件</h1>
+        <p>Playwright 任务调度与多账号池管理后台</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Navigation Tabs -->
+  <div class="tabs-container">
+    <button class="tab-btn active" onclick="switchTab('dashboard')">📊 运行与账号</button>
+    <button class="tab-btn" onclick="switchTab('generation')">⚙️ 生成与高级配置</button>
+    <button class="tab-btn" onclick="switchTab('license')">🔑 授权激活</button>
+  </div>
+
+  <!-- ==================== TAB 1: DASHBOARD ==================== -->
+  <div id="dashboard" class="tab-content active">
+    <!-- Grid Metrics (6-box layout) -->
+    <div class="metrics-grid">
+      <div class="metric-card purple-glow">
+        <div class="title">排队任务</div>
+        <div class="value" id="statQueued">0</div>
+      </div>
+      <div class="metric-card cyan-glow">
+        <div class="title">运行任务</div>
+        <div class="value" id="statRunning">0</div>
+      </div>
+      <div class="metric-card">
+        <div class="title">空闲通道</div>
+        <div class="value" id="statSlots">0</div>
+      </div>
+      <div class="metric-card">
+        <div class="title">账号总数</div>
+        <div class="value" id="statAccounts">0</div>
+      </div>
+      <div class="metric-card green-glow">
+        <div class="title">本次成功</div>
+        <div class="value" id="statSuccess">0</div>
+      </div>
+      <div class="metric-card red-glow">
+        <div class="title">本次失败</div>
+        <div class="value" id="statFailed">0</div>
+      </div>
+    </div>
+
+    <!-- Compact Quick Actions -->
+    <div style="display: flex; gap: 6px; margin-bottom: 10px;">
+      <button class="btn-success" id="btnDiagnose" style="flex: 1; padding: 6px 8px; font-size: 13px; font-weight: 500;" onclick="triggerDiagnose()">🩺 诊断并唤醒调度</button>
+      <button class="btn-danger" id="btnShutdown" style="flex: 1; padding: 6px 8px; font-size: 13px; font-weight: 500;" onclick="triggerShutdown()">🛑 关闭所有浏览器</button>
+    </div>
+    <!-- Pool Path -->
+    <div class="card">
+      <div class="card-header">
+        <h3>📁 账号池文件配置</h3>
+      </div>
+      <div class="form-row">
+        <label>文本账号池路径 (每行格式: 邮箱----密码)</label>
+        <div class="input-group">
+          <input type="text" id="accountPoolPath" placeholder="D:/accounts.txt">
+          <button class="btn-secondary" id="btnBrowse" onclick="browsePoolFile()">📂 选择</button>
+        </div>
+      </div>
+      <div style="display: flex; gap: 8px;">
+        <button onclick="reloadAccounts()">🔄 重新加载账号池</button>
+      </div>
+    </div>
+
+    <!-- Add Account -->
+    <div class="card">
+      <div class="card-header">
+        <h3>➕ 手动添加新账号</h3>
+      </div>
+      <div class="form-row-inline">
+        <div class="form-row">
+          <label>Runway 账号邮箱</label>
+          <input type="text" id="addEmail" placeholder="example@mail.com">
+        </div>
+        <div class="form-row">
+          <label>账号密码</label>
+          <input type="password" id="addPassword" placeholder="******">
+        </div>
+      </div>
+      <button class="btn-success" onclick="addAccount()">➕ 保存到账号池</button>
+    </div>
+
+    <!-- Account Table List -->
+    <div class="card">
+      <div class="card-header">
+        <h3>📋 账号并发运行表</h3>
+      </div>
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>账号别名</th>
+              <th style="width: 60px; text-align: center;">启停</th>
+              <th style="width: 80px; text-align: center;">任务并发</th>
+              <th style="width: 80px; text-align: center;">浏览器数</th>
+              <th style="width: 60px; text-align: center;">操作</th>
+            </tr>
+          </thead>
+          <tbody id="accountTableBody">
+            <tr>
+              <td colspan="5" style="text-align: center; color: var(--text-muted);">暂无加载的账号，请检查账号池配置</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Spacing before logs -->
+    <div style="height: 15px;"></div>
+
+    <!-- Terminal Console Logs -->
+    <div class="terminal-container">
+      <div class="terminal-header">
+        <div class="terminal-title">
+          <span class="terminal-pulse"></span>
+          运行日志调试窗口
+        </div>
+        <div style="display: flex; gap: 10px; align-items: center;">
+          <label style="display: flex; align-items: center; gap: 4px; cursor: pointer; color: var(--text-secondary); font-size: 13px;">
+            <input type="checkbox" id="logAutoScroll" checked> 自动滚动
+          </label>
+          <button class="btn-secondary" style="padding: 2px 8px; font-size: 12px;" onclick="clearLogs()">清空</button>
+        </div>
+      </div>
+      <div class="terminal-body" id="logConsole">正在建立连接并获取日志...</div>
+    </div>
+  </div>
+
+  <!-- ==================== TAB 3: GENERATION ==================== -->
+  <div id="generation" class="tab-content">
+    <div class="card">
+      <div class="card-header">
+        <h3>🎬 Runway 生成基本参数</h3>
+      </div>
+
+      <div class="form-row">
+        <label>视频生成模型</label>
+        <select id="modelSelect">
+          <option value="seedance_2.0">Seedance 2.0 (默认)</option>
+        </select>
+      </div>
+
+      <div class="form-row">
+        <label>首尾帧 / 全能参考生成模式</label>
+        <select id="generationModeSelect">
+          <option value="multi_reference">多图参考模式 (Multi-Reference)</option>
+          <option value="keyframe">首尾双帧模式 (Keyframe)</option>
+          <option value="text_to_video">纯文字生成 (Text to Video)</option>
+        </select>
+      </div>
+
+      <div class="form-row">
+        <label>视频画幅比例 (Aspect Ratio)</label>
+        <select id="aspectRatioSelect">
+          <option value="16:9">16:9 (横屏)</option>
+          <option value="9:16">9:16 (竖屏)</option>
+          <option value="1:1">1:1 (方画幅)</option>
+          <option value="21:9">21:9 (宽荧幕)</option>
+          <option value="3:4">3:4 (正方形比例)</option>
+          <option value="4:3">4:3 (经典比例)</option>
+        </select>
+      </div>
+
+      <div class="form-row">
+        <label>生成视频时长 (秒)</label>
+        <select id="durationSelect">
+          <option value="4">4 秒</option>
+          <option value="5">5 秒</option>
+          <option value="6">6 秒</option>
+          <option value="7">7 秒</option>
+          <option value="8">8 秒</option>
+          <option value="9">9 秒</option>
+          <option value="10">10 秒</option>
+          <option value="11">11 秒</option>
+          <option value="12">12 秒</option>
+          <option value="13">13 秒</option>
+          <option value="14">14 秒</option>
+          <option value="15">15 秒</option>
+        </select>
+      </div>
+
+      <div class="form-row">
+        <label>固定随机种子 (Seed) - 留空表示随机</label>
+        <input type="text" id="seedInput" placeholder="例如: 8493820">
+      </div>
+    </div>
+    
+    <!-- Spacing between Basic settings and Advanced parameters -->
+    <div style="height: 15px;"></div>
+    <div class="card">
+      <div class="card-header">
+        <h3>🔍 进程与性能参数</h3>
+      </div>
+
+      <div class="form-row">
+        <label>Playwright 浏览器核心</label>
+        <select id="browserSelect">
+          <option value="chromium">Chromium 内置核心 (默认)</option>
+          <option value="chrome">Google Chrome 本地安装</option>
+          <option value="msedge">Microsoft Edge 本地安装</option>
+        </select>
+      </div>
+
+      <div class="form-row">
+        <label>最大全局并发任务数 (0 表示按账号数量自适应)</label>
+        <input type="number" id="maxConcurrentInput" min="0" max="50" value="0">
+      </div>
+
+      <div class="form-row">
+        <label>多窗口宫格排布方式</label>
+        <select id="smartArrangeLayoutSelect">
+          <option value="1x2">1 x 2（900 x 600）</option>
+          <option value="2x2">2 x 2（800 x 600）</option>
+          <option value="2x3">2 x 3（720 x 600）</option>
+          <option value="2x4">2 x 4（640 x 600）</option>
+        </select>
+      </div>
+
+      <div class="form-row">
+        <label>任务状态查询策略</label>
+        <select id="pollingMethodSelect">
+          <option value="page">网页元素状态轮询</option>
+        </select>
+      </div>
+
+      <div class="form-row-inline">
+        <div class="form-row">
+          <label>浏览器超时极限(秒)</label>
+          <input type="number" id="timeoutInput" min="60" max="18000" value="6000">
+        </div>
+        <div class="form-row">
+          <label>并发队列等待极限(秒)</label>
+          <input type="number" id="concurrentWaitTimeoutInput" min="60" max="9999999" value="999999">
+        </div>
+      </div>
+    </div>
+
+    <!-- Toggle Options -->
+    <div class="card">
+      <div class="card-header">
+        <h3>⚙️ 开关行为配置</h3>
+      </div>
+
+      <div class="switch-container">
+        <div class="switch-label">
+          后台静默运行 (Headless)
+          <p>启用后浏览器窗口在后台静默执行，否则显示调试窗口</p>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="headlessCheckbox">
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="switch-container">
+        <div class="switch-label">
+          保持浏览器运行 (Keep Alive)
+          <p>生成结束后不关闭浏览器，下次任务免重新登录</p>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="keepBrowserCheckbox" disabled>
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="switch-container">
+        <div class="switch-label">
+          智能多窗平铺排布 (Smart Arrange)
+          <p>按选择的宫格方式摆放窗口，页面内容高度保持稳定</p>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="smartArrangeCheckbox">
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="switch-container">
+        <div class="switch-label">
+          异常保存截图
+          <p>当任务报错或卡死时，自动保存当时网页截图以供分析</p>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="screenshotCheckbox">
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="switch-container">
+        <div class="switch-label">
+          自动切换账号
+          <p>当前账号达到额度限制或冷却时，自动轮询空闲账号</p>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="autoSwitchCheckbox">
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="switch-container">
+        <div class="switch-label">
+          仅使用付费账号
+          <p>过滤免费（限额）账号，只在付费订阅账号中分发</p>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="paidOnlyCheckbox">
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== TAB 5: LICENSE ==================== -->
+  <div id="license" class="tab-content">
+    <div class="card">
+      <div class="card-header">
+        <h3>🔑 授权管理</h3>
+      </div>
+
+      <div class="lic-info-row">
+        <span class="lic-info-key">授权状态</span>
+        <span class="lic-info-val" id="licStatus">获取中...</span>
+      </div>
+      <div class="lic-info-row">
+        <span class="lic-info-key">到期时间</span>
+        <span class="lic-info-val" id="licExpiry">-</span>
+      </div>
+
+      <div class="form-row" style="margin-top: 12px;">
+        <label>设备机器码</label>
+        <div class="lic-code-box">
+          <span id="machineCodeText">loading...</span>
+          <button class="btn-secondary" style="padding: 2px 8px; font-size: 12px;" onclick="copyMachineCode()">📋 复制</button>
+        </div>
+      </div>
+
+      <div class="form-row" style="margin-top: 14px;">
+        <label>激活授权码</label>
+        <input type="text" id="licKeyInput" placeholder="RWPG1-XXXXX-XXXXX-XXXXX">
+      </div>
+
+      <div style="display: flex; gap: 8px;">
+        <button class="btn-success" id="btnActivate" onclick="activateLicense()">✨ 激活授权</button>
+        <button class="btn-secondary" id="btnDeactivate" onclick="deactivateLicense()">🔓 注销授权</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification element -->
+  <div class="toast" id="toast">
+    <span id="toastIcon">💡</span>
+    <span id="toastText">提示信息</span>
+  </div>
+
+  <!-- Diagnosis report modal -->
+  <div class="modal-overlay" id="diagModal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h4>🩺 状态诊断与一键恢复报告</h4>
+      </div>
+      <div class="modal-body" id="diagReportText">正在获取报告...</div>
+      <div class="modal-footer">
+        <button class="btn-success" onclick="closeModal('diagModal')">已阅并关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="../../../plugin-sdk.js"></script>
+  <script>
+    var _sdkReady = false;
+
+    // Tab Switching Logic
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.getAttribute('onclick').includes(tabId)) {
+          btn.classList.add('active');
+        }
+      });
+      document.querySelectorAll('.tab-content').forEach(content => {
+        content.classList.remove('active');
+      });
+      document.getElementById(tabId).classList.add('active');
+    }
+
+    // Helper functions to set select element values
+    function setSelectValue(selectEl, value) {
+      if (value == null) return;
+      var strVal = String(value);
+      for (var i = 0; i < selectEl.options.length; i++) {
+        if (selectEl.options[i].value === strVal) {
+          selectEl.selectedIndex = i;
+          return;
+        }
+      }
+    }
+
+    // Helper to set checkbox state
+    function setCheckbox(id, value, fallbackValue) {
+      const el = document.getElementById(id);
+      if (el) {
+        el.checked = value !== undefined ? Boolean(value) : fallbackValue;
+      }
+    }
+
+    // Custom Toast Notification Function
+    function showToast(message, type = 'success') {
+      const toast = document.getElementById('toast');
+      const toastText = document.getElementById('toastText');
+      const toastIcon = document.getElementById('toastIcon');
+      
+      toastText.textContent = message;
+      toastIcon.textContent = type === 'success' ? '✅' : (type === 'error' ? '❌' : '💡');
+      
+      toast.className = 'toast show ' + type;
+      setTimeout(() => {
+        toast.className = 'toast';
+      }, 3000);
+    }
+
+    // Modal Control
+    function showModal(id, content) {
+      document.getElementById(id).classList.add('active');
+      if (content) {
+        document.getElementById('diagReportText').textContent = content;
+      }
+    }
+    function closeModal(id) {
+      document.getElementById(id).classList.remove('active');
+    }
+
+    // ----------------------------------------------------
+    // PARAMETER CHANGE LISTENERS
+    // ----------------------------------------------------
+    function save(key, value) {
+      if (_sdkReady) {
+        PluginSDK.saveParam(key, value);
+      }
+    }
+
+    document.getElementById('accountPoolPath').addEventListener('change', function() {
+      save('account_pool_path', this.value.trim());
+    });
+    document.getElementById('modelSelect').addEventListener('change', function() {
+      save('model', this.value);
+    });
+    document.getElementById('generationModeSelect').addEventListener('change', function() {
+      save('generation_mode', this.value);
+    });
+    document.getElementById('aspectRatioSelect').addEventListener('change', function() {
+      save('aspect_ratio', this.value);
+    });
+    document.getElementById('durationSelect').addEventListener('change', function() {
+      save('duration', parseInt(this.value) || 8);
+    });
+    document.getElementById('seedInput').addEventListener('input', function() {
+      save('seed', this.value.trim());
+    });
+    document.getElementById('timeoutInput').addEventListener('change', function() {
+      save('timeout', parseInt(this.value) || 6000);
+    });
+    document.getElementById('concurrentWaitTimeoutInput').addEventListener('change', function() {
+      save('concurrent_wait_timeout', parseInt(this.value) || 999999);
+    });
+    document.getElementById('maxConcurrentInput').addEventListener('change', function() {
+      save('max_concurrent_tasks', parseInt(this.value) || 0);
+    });
+    document.getElementById('pollingMethodSelect').addEventListener('change', function() {
+      save('polling_method', this.value);
+    });
+    document.getElementById('smartArrangeLayoutSelect').addEventListener('change', function() {
+      save('smart_arrange_layout', this.value);
+    });
+    document.getElementById('browserSelect').addEventListener('change', function() {
+      save('playwright_browser', this.value);
+    });
+
+    // Checkbox Listeners
+    document.getElementById('headlessCheckbox').addEventListener('change', function() {
+      save('playwright_headless', this.checked);
+    });
+    document.getElementById('keepBrowserCheckbox').addEventListener('change', function() {
+      save('playwright_keep_browser', this.checked);
+    });
+    document.getElementById('smartArrangeCheckbox').addEventListener('change', function() {
+      save('smart_arrange', this.checked);
+    });
+    document.getElementById('screenshotCheckbox').addEventListener('change', function() {
+      save('debug_save_screenshot', this.checked);
+    });
+    document.getElementById('autoSwitchCheckbox').addEventListener('change', function() {
+      save('auto_switch_account', this.checked);
+    });
+    document.getElementById('paidOnlyCheckbox').addEventListener('change', function() {
+      save('use_paid_accounts', this.checked);
+    });
+
+    // ----------------------------------------------------
+    // SDK ONREADY
+    // ----------------------------------------------------
+    PluginSDK.onReady(function (params) {
+      _sdkReady = true;
+
+      // Load saved values into inputs
+      if (params.account_pool_path) {
+        document.getElementById('accountPoolPath').value = params.account_pool_path;
+      }
+      if (params.model) {
+        setSelectValue(document.getElementById('modelSelect'), params.model);
+      }
+      if (params.generation_mode) {
+        setSelectValue(document.getElementById('generationModeSelect'), params.generation_mode);
+      }
+      if (params.aspect_ratio) {
+        setSelectValue(document.getElementById('aspectRatioSelect'), params.aspect_ratio);
+      }
+      if (params.duration) {
+        setSelectValue(document.getElementById('durationSelect'), String(params.duration));
+      }
+      if (params.seed) {
+        document.getElementById('seedInput').value = params.seed;
+      }
+      if (params.timeout != null) {
+        document.getElementById('timeoutInput').value = params.timeout;
+      }
+      if (params.concurrent_wait_timeout != null) {
+        document.getElementById('concurrentWaitTimeoutInput').value = params.concurrent_wait_timeout;
+      }
+      if (params.max_concurrent_tasks != null) {
+        document.getElementById('maxConcurrentInput').value = params.max_concurrent_tasks;
+      }
+      if (params.polling_method) {
+        setSelectValue(document.getElementById('pollingMethodSelect'), params.polling_method);
+      }
+      if (params.smart_arrange_layout) {
+        setSelectValue(document.getElementById('smartArrangeLayoutSelect'), params.smart_arrange_layout);
+      }
+      if (params.playwright_browser) {
+        setSelectValue(document.getElementById('browserSelect'), params.playwright_browser);
+      }
+
+      setCheckbox('headlessCheckbox', params.playwright_headless, false);
+      setCheckbox('keepBrowserCheckbox', false, false);
+      document.getElementById('keepBrowserCheckbox').disabled = true;
+      setCheckbox('smartArrangeCheckbox', params.smart_arrange, false);
+      setCheckbox('screenshotCheckbox', params.debug_save_screenshot, true);
+      setCheckbox('autoSwitchCheckbox', params.auto_switch_account, true);
+      setCheckbox('paidOnlyCheckbox', params.use_paid_accounts, false);
+
+      // Perform initial actions
+      PluginSDK.sendAction('check_license_status');
+      PluginSDK.sendAction('reload_accounts', { silent: true, account_pool_path: currentPoolPath() });
+      updateStats();
+      pollLogs();
+    });
+
+    // ----------------------------------------------------
+    // POLL STATS & LOGS
+    // ----------------------------------------------------
+    function updateStats() {
+      PluginSDK.sendAction('concurrent_capacity');
+      PluginSDK.sendAction('scheduler_status');
+    }
+
+    function pollLogs() {
+      PluginSDK.sendAction('get_logs');
+    }
+
+    // Keep polling active
+    setInterval(updateStats, 1500);
+    setInterval(pollLogs, 2000);
+
+    // ----------------------------------------------------
+    // ACTION CALLBACKS
+    // ----------------------------------------------------
+    PluginSDK.onAction('check_license_status', function (data) {
+      if (data && data.ok) {
+        document.getElementById('machineCodeText').textContent = data.machine_code || '-';
+        const statusEl = document.getElementById('licStatus');
+        const expiryEl = document.getElementById('licExpiry');
+        
+        statusEl.textContent = data.status_text || '未激活';
+        expiryEl.textContent = data.expiry_text || '-';
+        
+        if (data.is_valid) {
+          statusEl.className = 'status-badge success';
+        } else {
+          statusEl.className = 'status-badge danger';
+          if (data.error) {
+            expiryEl.textContent = data.expiry_text + ' (' + data.error + ')';
+          }
+        }
+      }
+    });
+
+    PluginSDK.onAction('activate_license', function (data) {
+      document.getElementById('btnActivate').disabled = false;
+      document.getElementById('btnActivate').textContent = '✨ 激活授权';
+      if (data && data.ok) {
+        showToast(data.message || '激活成功！', 'success');
+        document.getElementById('licKeyInput').value = '';
+        PluginSDK.sendAction('check_license_status');
+      } else {
+        showToast((data && data.error) ? data.error : '激活失败', 'error');
+      }
+    });
+
+    PluginSDK.onAction('deactivate_license', function (data) {
+      document.getElementById('btnDeactivate').disabled = false;
+      document.getElementById('btnDeactivate').textContent = '🔓 注销授权';
+      if (data && data.ok) {
+        showToast(data.message || '注销成功', 'success');
+        PluginSDK.sendAction('check_license_status');
+      } else {
+        showToast((data && data.error) ? data.error : '注销失败', 'error');
+      }
+    });
+
+    PluginSDK.onAction('scheduler_status', function (data) {
+      if (data && data.ok) {
+        document.getElementById('statQueued').textContent = data.queued !== undefined ? data.queued : '0';
+        document.getElementById('statRunning').textContent = data.running !== undefined ? data.running : '0';
+        document.getElementById('statSuccess').textContent = data.total_completed !== undefined ? data.total_completed : '0';
+        document.getElementById('statFailed').textContent = data.total_failed !== undefined ? data.total_failed : '0';
+      }
+    });
+
+    PluginSDK.onAction('concurrent_capacity', function (data) {
+      if (data && data.ok) {
+        document.getElementById('statSlots').textContent = data.available_slots !== undefined ? data.available_slots : '0';
+        document.getElementById('statAccounts').textContent = data.total_accounts !== undefined ? data.total_accounts : '0';
+        
+        // Render accounts table
+        const tbody = document.getElementById('accountTableBody');
+        const accounts = data.accounts || [];
+        if (accounts.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-muted);">暂无加载的账号，请检查账号池配置</td></tr>';
+          return;
+        }
+        
+        let html = '';
+        accounts.forEach(acc => {
+          const alias = acc.alias || (acc.email ? acc.email.split('@')[0] : '');
+          const isStop = acc.disabled;
+          const statusBtn = isStop 
+            ? `<button style="padding: 2px 8px; font-size: 11px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.15); background: rgba(255, 255, 255, 0.05); color: var(--text-secondary); cursor: pointer; font-weight: 500; outline: none; transition: all 0.2s;" onclick="toggleAccount('${alias}', true)">⚪ 已停用</button>`
+            : `<button style="padding: 2px 8px; font-size: 11px; border-radius: 12px; border: 1px solid rgba(0, 245, 212, 0.3); background: rgba(0, 245, 212, 0.08); color: var(--accent-cyan); cursor: pointer; font-weight: 500; outline: none; transition: all 0.2s;" onclick="toggleAccount('${alias}', false)">🟢 已启用</button>`;
+          const tasksCount = acc.active_tasks !== undefined ? acc.active_tasks : 0;
+          const limitCount = data.max_concurrent_per_account || 2;
+          const browsersCount = acc.browsers_count !== undefined ? acc.browsers_count : 0;
+          
+          html += `<tr>
+            <td style="font-weight: 500;">
+              ${alias}
+            </td>
+            <td style="text-align: center;">
+              ${statusBtn}
+            </td>
+            <td style="text-align: center; font-family: 'JetBrains Mono', monospace; font-weight: 600;">
+              <span style="color: ${tasksCount > 0 ? 'var(--accent-cyan)' : 'var(--text-secondary)'}">${tasksCount}</span>/${limitCount}
+            </td>
+            <td style="text-align: center; font-family: 'JetBrains Mono', monospace; font-weight: 600; color: ${browsersCount > 0 ? '#b388ff' : 'var(--text-secondary)'}">
+              ${browsersCount}
+            </td>
+            <td style="text-align: center; white-space: nowrap;">
+              <button class="btn-secondary" style="padding: 4px 8px; font-size: 12px; font-weight: bold; background-color: var(--accent-purple); color: #fff; border-radius: 4px; border: none; cursor: pointer; margin-right: 4px;" onclick="manualLogin('${alias}')" title="手动登录浏览器">🌐 登录</button>
+              <button class="btn-secondary btn-danger btn-icon" style="padding: 4px 8px; font-size: 12px;" onclick="deleteAccount(this, '${alias}')" title="删除账号">🗑️</button>
+            </td>
+          </tr>`;
+        });
+        tbody.innerHTML = html;
+      }
+    });
+
+    PluginSDK.onAction('manual_login', function (data) {
+      if (data && data.ok) {
+        showToast(data.message, 'success');
+      } else {
+        showToast((data && data.error) ? data.error : '无法启动登录浏览器', 'error');
+      }
+    });
+
+    PluginSDK.onAction('browse_pool_file', function (data) {
+      if (data && data.ok) {
+        document.getElementById('accountPoolPath').value = data.path;
+        showToast(data.message || '账号池选择成功！', 'success');
+        updateStats();
+      } else {
+        showToast((data && data.error) ? data.error : '未能选择文件', 'error');
+      }
+    });
+
+    PluginSDK.onAction('reload_accounts', function (data) {
+      if (data && data.ok) {
+        if (data.path) {
+          document.getElementById('accountPoolPath').value = data.path;
+        }
+        if (!data.silent) {
+          showToast(data.message || '重载账号池成功', 'success');
+        }
+        updateStats();
+      } else {
+        if (!data.silent) {
+          showToast((data && data.error) ? data.error : '重载失败', 'error');
+        }
+      }
+    });
+
+    PluginSDK.onAction('shutdown_browsers', function (data) {
+      document.getElementById('btnShutdown').disabled = false;
+      document.getElementById('btnShutdown').textContent = '🛑 关闭所有浏览器';
+      if (data && data.ok) {
+        showToast(data.message || '浏览器已关闭', 'success');
+        updateStats();
+      } else {
+        showToast((data && data.error) ? data.error : '操作失败', 'error');
+      }
+    });
+
+    PluginSDK.onAction('diagnose_and_wakeup', function (data) {
+      if (diagnoseResetTimer) {
+        clearTimeout(diagnoseResetTimer);
+        diagnoseResetTimer = null;
+      }
+      const btn = document.getElementById('btnDiagnose');
+      btn.disabled = false;
+      btn.textContent = '🩺 诊断并唤醒调度';
+      if (data && data.ok) {
+        const consoleEl = document.getElementById('logConsole');
+        if (consoleEl) {
+          consoleEl.textContent = '【诊断激活报告】\n' + data.message + '\n\n' + consoleEl.textContent;
+        }
+        showToast('已完成诊断并唤醒调度！', 'success');
+        updateStats();
+      } else {
+        showToast((data && data.error) ? data.error : '诊断失败', 'error');
+      }
+    });
+
+    PluginSDK.onAction('store_credential', function (data) {
+      if (data && data.ok) {
+        if (data.path) {
+          document.getElementById('accountPoolPath').value = data.path;
+        }
+        showToast(data.message || '账号已成功添加！', 'success');
+        document.getElementById('addEmail').value = '';
+        document.getElementById('addPassword').value = '';
+        // Automatically reload and status
+        PluginSDK.sendAction('reload_accounts');
+      } else {
+        showToast((data && data.error) ? data.error : '添加失败', 'error');
+      }
+    });
+
+    PluginSDK.onAction('delete_credential', function (data) {
+      if (data && data.ok) {
+        if (data.path) {
+          document.getElementById('accountPoolPath').value = data.path;
+        }
+        showToast(data.message || '账号已成功删除！', 'success');
+        PluginSDK.sendAction('reload_accounts');
+      } else {
+        showToast((data && data.error) ? data.error : '删除失败', 'error');
+      }
+    });
+
+    PluginSDK.onAction('toggle_account', function (data) {
+      if (data && data.ok) {
+        showToast(data.message || '更新成功！', 'success');
+        updateStats();
+      } else {
+        showToast((data && data.error) ? data.error : '更新失败', 'error');
+      }
+    });
+
+    PluginSDK.onAction('get_logs', function (data) {
+      if (data && data.ok && data.logs !== undefined) {
+        const consoleEl = document.getElementById('logConsole');
+        consoleEl.textContent = data.logs || '等待日志产生...';
+        
+        if (document.getElementById('logAutoScroll').checked) {
+          consoleEl.scrollTop = consoleEl.scrollHeight;
+        }
+      }
+    });
+
+    // ----------------------------------------------------
+    // UI HANDLERS
+    // ----------------------------------------------------
+    function browsePoolFile() {
+      PluginSDK.sendAction('browse_pool_file');
+    }
+
+    function currentPoolPath() {
+      const input = document.getElementById('accountPoolPath');
+      return input ? input.value.trim() : '';
+    }
+
+    function reloadAccounts() {
+      PluginSDK.sendAction('reload_accounts', { account_pool_path: currentPoolPath() });
+    }
+
+    function addAccount() {
+      const email = document.getElementById('addEmail').value.trim();
+      const password = document.getElementById('addPassword').value.trim();
+      if (!email || !password) {
+        showToast('邮箱或密码不能为空', 'error');
+        return;
+      }
+      PluginSDK.sendAction('store_credential', { email: email, password: password, account_pool_path: currentPoolPath() });
+    }
+
+    let deleteConfirmState = {};
+
+    function deleteAccount(btn, alias) {
+      if (!deleteConfirmState[alias]) {
+        // First click
+        deleteConfirmState[alias] = true;
+        btn.textContent = '⚠️ 确定';
+        btn.style.backgroundColor = 'var(--accent-pink)';
+        btn.title = '再次点击以确认删除该账号';
+        
+        // Reset after 3 seconds if not clicked again
+        setTimeout(() => {
+          if (deleteConfirmState[alias]) {
+            deleteConfirmState[alias] = false;
+            btn.textContent = '🗑️';
+            btn.style.backgroundColor = '';
+            btn.title = '删除账号';
+          }
+        }, 3000);
+      } else {
+        // Second click
+        deleteConfirmState[alias] = false;
+        PluginSDK.sendAction('delete_credential', { alias: alias, account_pool_path: currentPoolPath() });
+      }
+    }
+
+    function toggleAccount(alias, enabled) {
+      // Backend action toggle_account expects { alias, disabled }
+      PluginSDK.sendAction('toggle_account', { alias: alias, disabled: !enabled });
+    }
+
+    function manualLogin(alias) {
+      PluginSDK.sendAction('manual_login', { alias: alias });
+    }
+
+    function triggerShutdown() {
+      const btn = document.getElementById('btnShutdown');
+      btn.disabled = true;
+      btn.textContent = '🧹 正在取消排队并关闭...';
+      PluginSDK.sendAction('shutdown_browsers');
+    }
+
+    let diagnoseResetTimer = null;
+
+    function triggerDiagnose() {
+      const btn = document.getElementById('btnDiagnose');
+      if (btn.disabled) return;
+      btn.disabled = true;
+      btn.textContent = '诊断中...';
+      if (diagnoseResetTimer) {
+        clearTimeout(diagnoseResetTimer);
+      }
+      diagnoseResetTimer = setTimeout(() => {
+        btn.disabled = false;
+        btn.textContent = '🩺 诊断并唤醒调度';
+        diagnoseResetTimer = null;
+        showToast('诊断响应超时，已恢复按钮，请查看日志确认后台状态', 'error');
+      }, 20000);
+      PluginSDK.sendAction('diagnose_and_wakeup');
+    }
+
+    function clearLogs() {
+      document.getElementById('logConsole').textContent = '日志已清空';
+    }
+
+    function copyMachineCode() {
+      const mc = document.getElementById('machineCodeText').textContent;
+      if (mc === 'loading...' || mc.startsWith('出错')) {
+        showToast('无法复制有效的机器码', 'error');
+        return;
+      }
+      navigator.clipboard.writeText(mc).then(() => {
+        showToast('机器码已成功复制到剪贴板！', 'success');
+      }).catch(err => {
+        // Fallback for non-secure environments
+        const textArea = document.createElement("textarea");
+        textArea.value = mc;
+        document.body.appendChild(textArea);
+        textArea.select();
+        try {
+          document.execCommand('copy');
+          showToast('机器码已复制！', 'success');
+        } catch (e) {
+          showToast('复制失败: ' + err, 'error');
+        }
+        document.body.removeChild(textArea);
+      });
+    }
+
+    function activateLicense() {
+      const key = document.getElementById('licKeyInput').value.trim();
+      if (!key) {
+        showToast('请输入授权码！', 'error');
+        return;
+      }
+      const btn = document.getElementById('btnActivate');
+      btn.disabled = true;
+      btn.textContent = '激活中...';
+      PluginSDK.sendAction('activate_license', key);
+    }
+
+    function deactivateLicense() {
+      if (confirm('确定要注销当前的授权激活吗？注销后该设备将失去使用权限。')) {
+        const btn = document.getElementById('btnDeactivate');
+        btn.disabled = true;
+        btn.textContent = '注销中...';
+        PluginSDK.sendAction('deactivate_license');
+      }
+    }
+  </script>
+</body>
+</html>
