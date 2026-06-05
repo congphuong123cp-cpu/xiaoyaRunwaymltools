@@ -550,6 +550,90 @@ def _page_has_generation_activity(page: Any) -> bool:
     return False
 
 
+def _extract_runway_task_id(body: Any) -> str:
+    if not isinstance(body, dict):
+        return ""
+    direct = body.get("id") or body.get("taskId") or body.get("task_id") or body.get("uuid")
+    if direct:
+        return str(direct)
+    for key in ("task", "data", "result"):
+        obj = body.get(key)
+        if isinstance(obj, dict):
+            tid = obj.get("id") or obj.get("taskId") or obj.get("task_id") or obj.get("uuid")
+            if tid:
+                return str(tid)
+    return ""
+
+
+def _extract_runway_task_status(body: Any) -> str:
+    if not isinstance(body, dict):
+        return ""
+    for key in ("status", "state", "progressText"):
+        value = body.get(key)
+        if value:
+            return str(value)
+    for key in ("task", "data", "result"):
+        obj = body.get(key)
+        if isinstance(obj, dict):
+            status = _extract_runway_task_status(obj)
+            if status:
+                return status
+    return ""
+
+
+def _extract_http_urls_from_body(value: Any) -> list[str]:
+    found: list[str] = []
+
+    def walk(item: Any) -> None:
+        if isinstance(item, str):
+            if item.startswith(("http://", "https://")):
+                found.append(item)
+            else:
+                for match in re.findall(r"https?://[^\s\"'<>]+", item):
+                    found.append(match.rstrip(").,;"))
+        elif isinstance(item, list):
+            for child in item:
+                walk(child)
+        elif isinstance(item, dict):
+            for child in item.values():
+                walk(child)
+
+    walk(value)
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for url in found:
+        if url and url not in seen:
+            seen.add(url)
+            deduped.append(url)
+    return deduped
+
+
+def _extract_runway_video_urls_from_body(body: Any) -> list[str]:
+    urls = _extract_http_urls_from_body(body)
+    likely: list[str] = []
+    for url in urls:
+        lower = url.lower()
+        if (
+            ".mp4" in lower
+            or ".mov" in lower
+            or ("runway-task-artifacts" in lower and not lower.split("?")[0].endswith((".jpg", ".jpeg", ".png", ".webp", ".gif")))
+            or "download" in lower
+        ):
+            likely.append(url)
+    return likely
+
+
+def _body_mentions_task_ids(body: Any, task_ids: list[str]) -> bool:
+    ids = [str(tid) for tid in task_ids if tid]
+    if not ids:
+        return False
+    try:
+        text = json.dumps(body, ensure_ascii=False)
+    except Exception:
+        text = str(body)
+    return any(tid in text for tid in ids)
+
+
 def _save_error_confirmation_screenshot(page: Any, prefix: str) -> None:
     try:
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -5118,6 +5202,8 @@ def _generate_via_playwright_with_slot(
 
                 _captured_task_ids = []
                 _captured_gen_responses = []
+                _captured_task_video_urls = []
+                _last_net_task_status = {"value": ""}
 
                 # Record all existing video, source, and download URLs to exclude them from generated results
                 existing_video_urls = set()
@@ -5141,37 +5227,55 @@ def _generate_via_playwright_with_slot(
                 def _on_gen_response(response):
                     try:
                         url = response.url
+                        lower_url = url.lower()
                         method = response.request.method
-                        if method == "POST" and any(kw in url.lower() for kw in ["task", "generate", "video", "image_to_video", "text_to_video", "create"]):
+                        is_task_create = method == "POST" and "/v1/tasks" in lower_url
+                        is_task_poll = "/v1/tasks/" in lower_url
+                        is_asset_detail = "/v1/assets/" in lower_url and bool(_captured_task_ids)
+                        if not (is_task_create or is_task_poll or is_asset_detail):
+                            return
+                        if is_task_create:
                             _log(f"playwright: NET intercepted POST {url} status={response.status}")
+                        try:
+                            body = response.json()
+                        except Exception:
                             try:
-                                body = response.json()
+                                text = response.text()[:500]
+                                _log(f"playwright: NET response text: {text}")
+                            except Exception:
+                                pass
+                            return
+
+                        status = _extract_runway_task_status(body)
+                        if status and status != _last_net_task_status.get("value"):
+                            _last_net_task_status["value"] = status
+                            _log(f"playwright: NET current task status={status}")
+
+                        if is_task_create:
+                            try:
                                 _log(f"playwright: NET response body keys={list(body.keys())[:10]}")
-                                tid = body.get("id") or body.get("taskId") or body.get("task_id") or body.get("uuid")
-                                if not tid and isinstance(body.get("task"), dict):
+                                tid = _extract_runway_task_id(body)
+                                if tid and isinstance(body.get("task"), dict):
                                     task_obj = body["task"]
-                                    tid = task_obj.get("id") or task_obj.get("taskId") or task_obj.get("task_id") or task_obj.get("uuid")
-                                    if tid:
-                                        _log(f"playwright: NET extracted task_id from body.task: {tid}")
-                                        for k, v in task_obj.items():
-                                            _log(f"playwright: NET task.{k}={str(v)[:100]}")
-                                if not tid and isinstance(body.get("data"), dict):
-                                    data_obj = body["data"]
-                                    tid = data_obj.get("id") or data_obj.get("taskId") or data_obj.get("task_id")
-                                    if tid:
-                                        _log(f"playwright: NET extracted task_id from body.data: {tid}")
-                                if tid:
+                                    _log(f"playwright: NET extracted task_id from body.task: {tid}")
+                                    for k, v in task_obj.items():
+                                        _log(f"playwright: NET task.{k}={str(v)[:100]}")
+                                elif tid:
+                                    _log(f"playwright: NET extracted task_id: {tid}")
+                                if tid and str(tid) not in _captured_task_ids:
                                     _captured_task_ids.append(str(tid))
                                     _log(f"playwright: NET captured task_id={tid}")
-                                else:
+                                elif not tid:
                                     _log(f"playwright: NET could not find task_id in response, full body: {json.dumps(body)[:500]}")
                                 _captured_gen_responses.append({"url": url, "body": body})
                             except Exception as e:
-                                try:
-                                    text = response.text()[:500]
-                                    _log(f"playwright: NET response text: {text}")
-                                except Exception:
-                                    pass
+                                _log(f"playwright: NET task create parse error: {e}", level="WARN")
+
+                        if _body_mentions_task_ids(body, _captured_task_ids):
+                            for candidate in _extract_runway_video_urls_from_body(body):
+                                if candidate not in _captured_task_video_urls:
+                                    _captured_task_video_urls.append(candidate)
+                                    _log(f"playwright: NET captured task-bound video url from {url}")
                     except Exception:
                         pass
 
@@ -5419,6 +5523,10 @@ def _generate_via_playwright_with_slot(
                                     page.wait_for_timeout(3000)
                         except Exception as nav_exc:
                             _log(f"playwright: navigate back failed: {nav_exc}", level="ERROR")
+                    if _captured_task_video_urls:
+                        video_url = _captured_task_video_urls[0]
+                        _log("playwright: using task-bound network video url")
+                        break
                     allow_video_result = bool(_captured_task_ids) and (time.time() - generate_clicked_at >= _MIN_RESULT_ACCEPT_SECONDS) and not _page_has_generation_activity(page)
                     if not allow_video_result and (poll_count <= 3 or poll_count % 12 == 0):
                         _log(
@@ -6817,6 +6925,8 @@ def _generate_via_playwright(
                         _log(f"playwright: Generate button appears disabled ({visual_reason}), but no concurrent limit detected, will try force click", level="WARN")
                     _captured_task_ids2 = []
                     _captured_gen_responses2 = []
+                    _captured_task_video_urls2 = []
+                    _last_net_task_status2 = {"value": ""}
 
                     # Record all existing video, source, and download URLs to exclude them from generated results
                     existing_video_urls2 = set()
@@ -6840,37 +6950,55 @@ def _generate_via_playwright(
                     def _on_gen_response2(response):
                         try:
                             url = response.url
+                            lower_url = url.lower()
                             method = response.request.method
-                            if method == "POST" and any(kw in url.lower() for kw in ["task", "generate", "video", "image_to_video", "text_to_video", "create"]):
+                            is_task_create = method == "POST" and "/v1/tasks" in lower_url
+                            is_task_poll = "/v1/tasks/" in lower_url
+                            is_asset_detail = "/v1/assets/" in lower_url and bool(_captured_task_ids2)
+                            if not (is_task_create or is_task_poll or is_asset_detail):
+                                return
+                            if is_task_create:
                                 _log(f"playwright: NET intercepted POST {url} status={response.status}")
+                            try:
+                                body = response.json()
+                            except Exception:
                                 try:
-                                    body = response.json()
+                                    text = response.text()[:500]
+                                    _log(f"playwright: NET response text: {text}")
+                                except Exception:
+                                    pass
+                                return
+
+                            status = _extract_runway_task_status(body)
+                            if status and status != _last_net_task_status2.get("value"):
+                                _last_net_task_status2["value"] = status
+                                _log(f"playwright: NET current task status={status}")
+
+                            if is_task_create:
+                                try:
                                     _log(f"playwright: NET response body keys={list(body.keys())[:10]}")
-                                    tid = body.get("id") or body.get("taskId") or body.get("task_id") or body.get("uuid")
-                                    if not tid and isinstance(body.get("task"), dict):
+                                    tid = _extract_runway_task_id(body)
+                                    if tid and isinstance(body.get("task"), dict):
                                         task_obj = body["task"]
-                                        tid = task_obj.get("id") or task_obj.get("taskId") or task_obj.get("task_id") or task_obj.get("uuid")
-                                        if tid:
-                                            _log(f"playwright: NET extracted task_id from body.task: {tid}")
-                                            for k, v in task_obj.items():
-                                                _log(f"playwright: NET task.{k}={str(v)[:100]}")
-                                    if not tid and isinstance(body.get("data"), dict):
-                                        data_obj = body["data"]
-                                        tid = data_obj.get("id") or data_obj.get("taskId") or data_obj.get("task_id")
-                                        if tid:
-                                            _log(f"playwright: NET extracted task_id from body.data: {tid}")
-                                    if tid:
+                                        _log(f"playwright: NET extracted task_id from body.task: {tid}")
+                                        for k, v in task_obj.items():
+                                            _log(f"playwright: NET task.{k}={str(v)[:100]}")
+                                    elif tid:
+                                        _log(f"playwright: NET extracted task_id: {tid}")
+                                    if tid and str(tid) not in _captured_task_ids2:
                                         _captured_task_ids2.append(str(tid))
                                         _log(f"playwright: NET captured task_id={tid}")
-                                    else:
+                                    elif not tid:
                                         _log(f"playwright: NET could not find task_id in response, full body: {json.dumps(body)[:500]}")
                                     _captured_gen_responses2.append({"url": url, "body": body})
-                                except Exception:
-                                    try:
-                                        text = response.text()[:500]
-                                        _log(f"playwright: NET response text: {text}")
-                                    except Exception:
-                                        pass
+                                except Exception as e:
+                                    _log(f"playwright: NET task create parse error: {e}", level="WARN")
+
+                            if _body_mentions_task_ids(body, _captured_task_ids2):
+                                for candidate in _extract_runway_video_urls_from_body(body):
+                                    if candidate not in _captured_task_video_urls2:
+                                        _captured_task_video_urls2.append(candidate)
+                                        _log(f"playwright: NET captured task-bound video url from {url}")
                         except Exception:
                             pass
 
@@ -7117,6 +7245,11 @@ def _generate_via_playwright(
                         if "PLUGIN_ERROR" in str(poll_url_exc):
                             raise
                         _log(f"playwright: poll URL check error: {poll_url_exc}", level="WARN")
+
+                    if _captured_task_video_urls2:
+                        video_url = _captured_task_video_urls2[0]
+                        _log("playwright: using task-bound network video url")
+                        break
 
                     progress_text = ""
                     progress_pct = 0
