@@ -1,5 +1,5 @@
 {
-  "version": "2026.06.06.5",
+  "version": "2026.06.06.6",
   "zip_url": "https://github.com/congphuong123cp-cpu/xiaoyaRunwaymltools/archive/refs/heads/main.zip",
-  "notes": "发布包装版 main.py 与授权模块，兼容旧机器码授权和新版在线通用码。"
+  "notes": "增强多点授权验证，关键生成、调度、浏览器和下载路径都会进行授权 gate。"
 }
