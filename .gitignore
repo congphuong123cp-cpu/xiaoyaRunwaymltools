@@ -4,6 +4,7 @@ layout_test_shots/
 *.mp4
 *.png
 *.json
+!version.json
 *.dat
 runwayml_api_keys.txt
 runwayml_plugin_config.json

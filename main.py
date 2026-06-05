@@ -25,12 +25,15 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import threading
 import time
 import traceback
+import tempfile
 import uuid
+import zipfile
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
@@ -71,7 +74,10 @@ _LOG_FILE = plugin_dir / "runwayml_plugin_debug.log"
 _ENV_LOGGED = False
 _TASK_TAG = ""
 _LOG_ROTATE_BYTES = 20 * 1024 * 1024
-_PLUGIN_VERSION = "2026-05-20-v1"
+_PLUGIN_VERSION = "2026.06.06.1"
+_UPDATE_REPO = "congphuong123cp-cpu/xiaoyaRunwaymltools"
+_UPDATE_VERSION_URL = f"https://raw.githubusercontent.com/{_UPDATE_REPO}/main/version.json"
+_UPDATE_ARCHIVE_URL = f"https://github.com/{_UPDATE_REPO}/archive/refs/heads/main.zip"
 
 RUNWAYML_API_BASE = "https://api.dev.runwayml.com/v1"
 RUNWAYML_WEB_BASE = "https://app.runwayml.com"
@@ -115,9 +121,12 @@ def _is_manual_close_error(msg: str) -> bool:
     lower = str(msg or "").lower()
     return (
         "target closed" in lower
+        or "target page" in lower and "closed" in lower
         or "browser closed" in lower
+        or "browser has been closed" in lower
         or "context closed" in lower
         or "page closed" in lower
+        or "has been closed" in lower
         or "手动关闭" in msg
         or "被关闭" in msg
         or "已关闭" in msg
@@ -2824,6 +2833,7 @@ class _BrowserPool:
         browser_channel: str = "",
         grid_size: int = 1,
         arrange_layout: str = "2x2",
+        zoom_factor: Any = 1.0,
     ) -> tuple[Any, Any, int, int] | None:
         launch_args = []
         screen_w = 1920
@@ -2842,63 +2852,36 @@ class _BrowserPool:
         except Exception as e:
             _log(f"BrowserPool: screen resolution detection error: {e}", level="WARN")
 
-        # 默认模式使用 800x600；宫格模式压缩宽度，保留 600 高度。
-        # 行数较多时允许窗口上下重叠，也不要牺牲 Seedance 参数区的可读高度。
         tile_w = 800
         tile_h = 600
 
         if position_index >= 0 and not headless:
-            layout = str(arrange_layout or "").strip().lower()
-            if layout in ("1x2", "2", "2x1"):
-                cols, rows = 2, 1
-                tile_w, tile_h = 900, 600
-            elif layout in ("2x2", "4"):
-                cols, rows = 2, 2
-                tile_w, tile_h = 800, 600
-            elif layout in ("2x3", "6"):
-                cols, rows = 2, 3
-                tile_w, tile_h = 720, 600
-            elif layout in ("2x4", "8"):
-                cols, rows = 2, 4
-                tile_w, tile_h = 640, 600
-            else:
-                if grid_size <= 2:
-                    cols, rows = 2, 1
-                    tile_w, tile_h = 900, 600
-                elif grid_size <= 4:
-                    cols, rows = 2, 2
-                    tile_w, tile_h = 800, 600
-                elif grid_size <= 6:
-                    cols, rows = 2, 3
-                    tile_w, tile_h = 720, 600
-                else:
-                    cols, rows = 2, 4
-                    tile_w, tile_h = 640, 600
-
-            screen_w_physical = screen_w
-            screen_h_physical = screen_h
-
-            col = position_index % cols
-            row = (position_index // cols) % rows
-
-            # 使用均匀分布公式锁在屏幕内；当行数多于屏幕高度时自然纵向重叠。
-            if cols > 1:
-                physical_x = col * (screen_w_physical - tile_w) // (cols - 1)
+            try:
+                smart_zoom = max(0.3, min(1.0, float(zoom_factor or 1.0)))
+            except Exception:
+                smart_zoom = 1.0
+            # Smart Arrange uses a fixed 800x600 logical page. Match the Chrome
+            # outer window to the selected page zoom so the visible area stays snug.
+            tile_w = max(416, int((800 * smart_zoom) + 16 + 0.5))
+            tile_h = max(395, int((600 * smart_zoom) + 95 + 0.5))
+            col = position_index % 4
+            row = position_index // 4
+            if screen_w > tile_w:
+                physical_x = int(col * (screen_w - tile_w) / 3)
             else:
                 physical_x = 0
-
-            if rows > 1:
-                physical_y = row * (screen_h_physical - tile_h) // (rows - 1)
+            if screen_h > tile_h + 60:
+                physical_y = int(row * (screen_h - 60 - tile_h))
             else:
-                physical_y = 0
+                physical_y = row * 100
 
             launch_args.extend([
                 f"--window-position={physical_x},{physical_y}",
                 f"--window-size={tile_w},{tile_h}"
             ])
             _log(
-                f"BrowserPool: layout={layout or 'auto'} grid_size={grid_size} "
-                f"→ {cols}cols×{rows}rows, physical {tile_w}x{tile_h} at ({physical_x},{physical_y})"
+                f"BrowserPool: smart arrange slot index {position_index} "
+                f"-> position={physical_x},{physical_y}, size={tile_w},{tile_h}, zoom={smart_zoom:.2f}"
             )
         elif not headless:
             launch_args.append(f"--window-size={tile_w},{tile_h}")
@@ -3057,6 +3040,7 @@ class _BrowserPool:
                 browser_channel=browser_channel,
                 grid_size=grid_size,
                 arrange_layout=arrange_layout,
+                zoom_factor=zoom_factor,
             )
             if launch_result is None:
                 _log("BrowserPool: launch new browser failed", level="ERROR")
@@ -3070,46 +3054,57 @@ class _BrowserPool:
             pw, browser, tile_w, tile_h = launch_result
 
             try:
-                # 获取设备的像素比缩放（Windows DPI 缩放），将物理像素转换为逻辑像素
-                dpr = 1.0
-                try:
-                    from PySide6.QtGui import QGuiApplication
-                    app = QGuiApplication.instance()
-                    if app and app.primaryScreen():
-                        dpr = app.primaryScreen().devicePixelRatio()
-                except Exception:
-                    pass
-
-                # RunwayML 桌面布局最低逻辑宽度；宫格模式压缩显示高度，但不让页面进入窄屏布局。
-                _RUNWAY_MIN_LOGICAL_W = 914
-                layout_key = str(arrange_layout or "").strip().lower() if smart_arrange else ""
-                _RUNWAY_TARGET_LOGICAL_H = 500 if layout_key in ("2x2", "4", "2x3", "6", "2x4", "8") else 686
-
-                # Estimate the real web content area inside Chrome's outer window.
-                # Chrome title/address/border typically consumes about 95px height and 16px width.
-                # Width may be cropped, but height must fit completely in the visible web area.
-                estimated_content_w = max(320.0, float(tile_w - 16))
-                estimated_content_h = max(240.0, float(tile_h - 95))
-
-                if str(zoom_factor).strip().lower() == "auto":
-                    # Height-first: browser width may crop content; page height remains fully visible.
-                    zoom_h = estimated_content_h / float(_RUNWAY_TARGET_LOGICAL_H)
-                    zoom_f = max(0.45, min(1.0, zoom_h))
-                else:
+                if smart_arrange:
+                    logical_width = 800
+                    logical_height = 600
                     try:
-                        zoom_f = max(0.3, min(1.0, float(zoom_factor)))
+                        zoom_f = max(0.3, min(1.0, float(zoom_factor or 1.0)))
                     except Exception:
                         zoom_f = 1.0
-
-                # Fixed Playwright viewport locks page layout. Manual browser resizing changes only the visible crop.
-                logical_width = max(_RUNWAY_MIN_LOGICAL_W, int((estimated_content_w / zoom_f) + 0.999))
-                logical_height = _RUNWAY_TARGET_LOGICAL_H
+                else:
+                    _RUNWAY_MIN_LOGICAL_W = 914
+                    _RUNWAY_TARGET_LOGICAL_H = 686
+                    estimated_content_w = max(320.0, float(tile_w - 16))
+                    estimated_content_h = max(240.0, float(tile_h - 95))
+                    if str(zoom_factor).strip().lower() == "auto":
+                        zoom_h = estimated_content_h / float(_RUNWAY_TARGET_LOGICAL_H)
+                        zoom_f = max(0.45, min(1.0, zoom_h))
+                    else:
+                        try:
+                            zoom_f = max(0.3, min(1.0, float(zoom_factor)))
+                        except Exception:
+                            zoom_f = 1.0
+                    logical_width = max(_RUNWAY_MIN_LOGICAL_W, int((estimated_content_w / zoom_f) + 0.999))
+                    logical_height = _RUNWAY_TARGET_LOGICAL_H
 
                 _log(
                     f"BrowserPool: viewport tile={tile_w}x{tile_h} (outer), "
-                    f"estimated_content={estimated_content_w:.0f}x{estimated_content_h:.0f}, "
+                    f"smart_arrange={smart_arrange}, "
                     f"zoom_f={zoom_f:.3f}, logical_viewport={logical_width}x{logical_height}"
                 )
+
+                def _restore_smart_window_size(page_obj: Any, reason: str) -> None:
+                    if not smart_arrange or headless:
+                        return
+                    try:
+                        cdp_page = ctx.new_cdp_session(page_obj)
+                        win_info = cdp_page.send("Browser.getWindowForTarget")
+                        window_id = win_info.get("windowId")
+                        if window_id is not None:
+                            cdp_page.send(
+                                "Browser.setWindowBounds",
+                                {
+                                    "windowId": window_id,
+                                    "bounds": {
+                                        "width": int(tile_w),
+                                        "height": int(tile_h),
+                                    },
+                                },
+                            )
+                            _log(f"BrowserPool: restored smart window size {tile_w}x{tile_h} after {reason}")
+                    except Exception as bounds_exc:
+                        _log(f"BrowserPool: restore smart window size failed after {reason}: {bounds_exc}", level="WARN")
+
                 ctx_opts: dict[str, Any] = {
                     "viewport": {"width": logical_width, "height": logical_height},
                 }
@@ -3141,9 +3136,10 @@ class _BrowserPool:
                             cookies = [
                                 {"name": k.strip(), "value": v.strip(), "domain": domain, "path": "/"}
                                 for domain in domains
-                            ]
+                        ]
                             ctx.add_cookies(cookies)
                 page = ctx.new_page()
+                _restore_smart_window_size(page, "context/page creation")
                 physical_inner_w = 0
                 physical_inner_h = 0
                 try:
@@ -3182,6 +3178,7 @@ class _BrowserPool:
                 try:
                     ctx = browser.new_context(viewport={"width": logical_width, "height": logical_height})
                     page = ctx.new_page()
+                    _restore_smart_window_size(page, "fallback context/page creation")
                     physical_inner_w = 0
                     physical_inner_h = 0
                     try:
@@ -3851,7 +3848,7 @@ def _generate_via_playwright_with_slot(
     )
     use_cdp_fit = False
     target_page_w = max(914, _safe_int(params.get("target_page_width"), 914))
-    target_page_h = max(500, _safe_int(params.get("target_page_height"), 500))
+    target_page_h = max(686, _safe_int(params.get("target_page_height"), 686))
     locked_canvas_w = target_page_w
     locked_canvas_h = target_page_h
     try:
@@ -7658,10 +7655,11 @@ _DEFAULT_PARAMS: dict[str, Any] = {
     "concurrent_wait_timeout": 999999,
     "polling_method": "page",
     "smart_arrange": False,
-    "playwright_zoom_factor": "auto",
+    "playwright_zoom_factor": 1.0,
+    "playwright_zoom_factor_options": "0.5,0.6,0.7,0.75,0.8,0.9,1.0",
     "smart_arrange_layout": "2x2",
     "target_page_width": 914,
-    "target_page_height": 500,
+    "target_page_height": 686,
     "aspect_ratio_options": "16:9,9:16,21:9,1:1,3:4,4:3",
     "duration_options": "4,5,6,7,8,9,10,11,12,13,14,15",
     "model_options": "seedance_2.0",
@@ -8135,6 +8133,15 @@ def generate(context: dict) -> list[str]:
                         break
                     except Exception as pw_exc:
                         pw_last_exc = pw_exc
+                        slot_was_closed = False
+                        if pw_slot:
+                            try:
+                                slot_was_closed = bool(
+                                    (not getattr(pw_slot, "is_alive", True))
+                                    or (getattr(pw_slot, "page", None) is not None and pw_slot.page.is_closed())
+                                )
+                            except Exception:
+                                slot_was_closed = True
                         if pw_slot:
                             _BROWSER_POOL.release(pw_slot.slot_id, keep_alive=False)
                             pw_slot = None
@@ -8150,9 +8157,14 @@ def generate(context: dict) -> list[str]:
                             raise pw_exc
                         
                         # Manual close/cancel is also terminal: the user intentionally stopped this task.
-                        is_manual_cancel = _is_manual_close_error(msg)
+                        is_manual_cancel = slot_was_closed or _is_manual_close_error(msg)
                         if is_manual_cancel:
-                            _log(f"playwright: BROWSER CLOSED/MANUAL CANCEL detected: {msg}. Aborting task immediately without switching accounts.", level="ERROR")
+                            _log(
+                                f"playwright: BROWSER CLOSED/MANUAL CANCEL detected "
+                                f"(slot_was_closed={slot_was_closed}): {msg}. "
+                                "Aborting task immediately without switching accounts.",
+                                level="ERROR",
+                            )
                             raise pw_exc
                         
                         # Set a cooldown if Runway is at capacity or an external task occupies the account.
@@ -8994,6 +9006,109 @@ def _run_manual_login(alias: str) -> None:
         _log(f"manual_login: thread error: {exc}", level="ERROR")
 
 
+def _fetch_update_manifest() -> dict[str, Any]:
+    resp = requests.get(_UPDATE_VERSION_URL, timeout=30)
+    resp.raise_for_status()
+    data = resp.json()
+    if not isinstance(data, dict):
+        raise ValueError("version.json 格式错误")
+    return data
+
+
+def _check_plugin_update() -> dict[str, Any]:
+    manifest = _fetch_update_manifest()
+    remote_version = str(manifest.get("version") or "").strip()
+    zip_url = str(manifest.get("zip_url") or manifest.get("archive_url") or _UPDATE_ARCHIVE_URL).strip()
+    notes = str(manifest.get("notes") or manifest.get("message") or "").strip()
+    if not remote_version:
+        raise ValueError("version.json 缺少 version")
+    if not zip_url:
+        raise ValueError("version.json 缺少 zip_url")
+    return {
+        "ok": True,
+        "current_version": _PLUGIN_VERSION,
+        "remote_version": remote_version,
+        "has_update": remote_version != _PLUGIN_VERSION,
+        "zip_url": zip_url,
+        "notes": notes,
+        "repo": _UPDATE_REPO,
+    }
+
+
+def _safe_extract_update_zip(zip_path: Path, dest_dir: Path) -> Path:
+    with zipfile.ZipFile(str(zip_path), "r") as zf:
+        for member in zf.infolist():
+            name = member.filename.replace("\\", "/")
+            if name.startswith("/") or ".." in Path(name).parts:
+                raise ValueError(f"更新包包含非法路径: {member.filename}")
+        zf.extractall(str(dest_dir))
+
+    candidates: list[Path] = []
+    if (dest_dir / "main.py").is_file() and (dest_dir / "ui").is_dir():
+        candidates.append(dest_dir)
+    for child in dest_dir.iterdir():
+        if child.is_dir() and (child / "main.py").is_file() and (child / "ui").is_dir():
+            candidates.append(child)
+    if not candidates:
+        raise ValueError("更新包内未找到 main.py 和 ui 文件夹")
+    return candidates[0]
+
+
+def _install_plugin_update(zip_url: str = "") -> dict[str, Any]:
+    zip_url = str(zip_url or "").strip() or _UPDATE_ARCHIVE_URL
+    plugin_root = Path(_PLUGIN_FILE).resolve().parent
+    current_main = plugin_root / "main.py"
+    current_ui = plugin_root / "ui"
+    if not current_main.is_file():
+        raise FileNotFoundError(f"当前 main.py 不存在: {current_main}")
+    if not current_ui.is_dir():
+        raise FileNotFoundError(f"当前 ui 文件夹不存在: {current_ui}")
+
+    backup_root = plugin_dir / "update_backups" / datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_root.mkdir(parents=True, exist_ok=True)
+    tmp_parent = Path(tempfile.mkdtemp(prefix="runway_update_"))
+    try:
+        zip_path = tmp_parent / "update.zip"
+        with requests.get(zip_url, stream=True, timeout=120) as resp:
+            resp.raise_for_status()
+            with open(zip_path, "wb") as fh:
+                for chunk in resp.iter_content(chunk_size=1024 * 512):
+                    if chunk:
+                        fh.write(chunk)
+
+        extract_dir = tmp_parent / "extract"
+        extract_dir.mkdir(parents=True, exist_ok=True)
+        package_root = _safe_extract_update_zip(zip_path, extract_dir)
+        new_main = package_root / "main.py"
+        new_ui = package_root / "ui"
+        if not new_main.is_file() or not new_ui.is_dir():
+            raise ValueError("更新包校验失败: 缺少 main.py 或 ui/")
+
+        shutil.copy2(str(current_main), str(backup_root / "main.py"))
+        shutil.copytree(str(current_ui), str(backup_root / "ui"))
+
+        shutil.copy2(str(new_main), str(current_main))
+        if current_ui.exists():
+            shutil.rmtree(str(current_ui))
+        shutil.copytree(str(new_ui), str(current_ui))
+
+        _log(f"plugin updater: installed update from {zip_url}, backup={backup_root}")
+        return {
+            "ok": True,
+            "message": "更新完成，请重启字字动画后生效",
+            "backup_dir": str(backup_root),
+            "updated": ["main.py", "ui/"],
+        }
+    except Exception:
+        _log_exc("plugin updater failed")
+        raise
+    finally:
+        try:
+            shutil.rmtree(str(tmp_parent), ignore_errors=True)
+        except Exception:
+            pass
+
+
 def handle_action(action, data=None):
     if action == "manual_login":
         try:
@@ -9306,5 +9421,19 @@ def handle_action(action, data=None):
             return {"ok": True, "message": res.get("message"), **res}
         except Exception as e:
             return {"ok": False, "error": str(e)}
+
+    elif action == "check_plugin_update":
+        try:
+            return _check_plugin_update()
+        except Exception as e:
+            return {"ok": False, "error": str(e), "repo": _UPDATE_REPO}
+
+    elif action == "install_plugin_update":
+        try:
+            d = data if isinstance(data, dict) else {}
+            zip_url = str(d.get("zip_url") or "").strip()
+            return _install_plugin_update(zip_url)
+        except Exception as e:
+            return {"ok": False, "error": str(e), "repo": _UPDATE_REPO}
 
     return {"ok": False, "error": f"未知操作: {action}"}

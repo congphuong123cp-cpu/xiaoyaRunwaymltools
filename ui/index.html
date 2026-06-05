@@ -883,12 +883,15 @@
       </div>
 
       <div class="form-row">
-        <label>多窗口宫格排布方式</label>
-        <select id="smartArrangeLayoutSelect">
-          <option value="1x2">1 x 2（900 x 600）</option>
-          <option value="2x2">2 x 2（800 x 600）</option>
-          <option value="2x3">2 x 3（720 x 600）</option>
-          <option value="2x4">2 x 4（640 x 600）</option>
+        <label>浏览器网页缩放倍率</label>
+        <select id="zoomFactorSelect">
+          <option value="1.0">100%（约 816 x 695）</option>
+          <option value="0.9">90%（约 736 x 635）</option>
+          <option value="0.8">80%（约 656 x 575）</option>
+          <option value="0.75">75%（约 616 x 545）</option>
+          <option value="0.7">70%（约 576 x 515）</option>
+          <option value="0.6">60%（约 496 x 455）</option>
+          <option value="0.5">50%（约 416 x 395）</option>
         </select>
       </div>
 
@@ -942,7 +945,7 @@
       <div class="switch-container">
         <div class="switch-label">
           智能多窗平铺排布 (Smart Arrange)
-          <p>按选择的宫格方式摆放窗口，页面内容高度保持稳定</p>
+          <p>按账号并发数量自动摆放窗口，页面缩放倍率由上方参数控制</p>
         </div>
         <label class="switch">
           <input type="checkbox" id="smartArrangeCheckbox">
@@ -1018,6 +1021,17 @@
         <button class="btn-success" id="btnActivate" onclick="activateLicense()">✨ 激活授权</button>
         <button class="btn-secondary" id="btnDeactivate" onclick="deactivateLicense()">🔓 注销授权</button>
       </div>
+
+      <div class="form-row" style="margin-top: 16px;">
+        <label>插件更新</label>
+        <div class="lic-code-box">
+          <span id="updateStatusText">当前未检查更新</span>
+        </div>
+      </div>
+      <div style="display: flex; gap: 8px;">
+        <button class="btn-secondary" id="btnCheckUpdate" onclick="checkPluginUpdate()">检查更新</button>
+        <button class="btn-success" id="btnInstallUpdate" onclick="installPluginUpdate()">一键更新 main.py + ui/</button>
+      </div>
     </div>
   </div>
 
@@ -1043,6 +1057,7 @@
   <script src="../../../plugin-sdk.js"></script>
   <script>
     var _sdkReady = false;
+    var _latestUpdateZipUrl = "";
 
     // Tab Switching Logic
     function switchTab(tabId) {
@@ -1143,8 +1158,8 @@
     document.getElementById('pollingMethodSelect').addEventListener('change', function() {
       save('polling_method', this.value);
     });
-    document.getElementById('smartArrangeLayoutSelect').addEventListener('change', function() {
-      save('smart_arrange_layout', this.value);
+    document.getElementById('zoomFactorSelect').addEventListener('change', function() {
+      save('playwright_zoom_factor', parseFloat(this.value) || 1.0);
     });
     document.getElementById('browserSelect').addEventListener('change', function() {
       save('playwright_browser', this.value);
@@ -1207,8 +1222,8 @@
       if (params.polling_method) {
         setSelectValue(document.getElementById('pollingMethodSelect'), params.polling_method);
       }
-      if (params.smart_arrange_layout) {
-        setSelectValue(document.getElementById('smartArrangeLayoutSelect'), params.smart_arrange_layout);
+      if (params.playwright_zoom_factor != null) {
+        setSelectValue(document.getElementById('zoomFactorSelect'), String(params.playwright_zoom_factor));
       }
       if (params.playwright_browser) {
         setSelectValue(document.getElementById('browserSelect'), params.playwright_browser);
@@ -1288,6 +1303,42 @@
         PluginSDK.sendAction('check_license_status');
       } else {
         showToast((data && data.error) ? data.error : '注销失败', 'error');
+      }
+    });
+
+    PluginSDK.onAction('check_plugin_update', function (data) {
+      const btn = document.getElementById('btnCheckUpdate');
+      const statusEl = document.getElementById('updateStatusText');
+      btn.disabled = false;
+      btn.textContent = '检查更新';
+      if (data && data.ok) {
+        _latestUpdateZipUrl = data.zip_url || '';
+        const current = data.current_version || '-';
+        const remote = data.remote_version || '-';
+        if (data.has_update) {
+          statusEl.textContent = '发现新版本：' + remote + '（当前 ' + current + '）';
+          showToast('发现新版本：' + remote, 'success');
+        } else {
+          statusEl.textContent = '已是最新版本：' + current;
+          showToast('当前已是最新版本', 'success');
+        }
+      } else {
+        statusEl.textContent = '检查失败：' + ((data && data.error) ? data.error : '未知错误');
+        showToast(statusEl.textContent, 'error');
+      }
+    });
+
+    PluginSDK.onAction('install_plugin_update', function (data) {
+      const btn = document.getElementById('btnInstallUpdate');
+      const statusEl = document.getElementById('updateStatusText');
+      btn.disabled = false;
+      btn.textContent = '一键更新 main.py + ui/';
+      if (data && data.ok) {
+        statusEl.textContent = data.message || '更新完成，请重启字字动画后生效';
+        showToast(statusEl.textContent, 'success');
+      } else {
+        statusEl.textContent = '更新失败：' + ((data && data.error) ? data.error : '未知错误');
+        showToast(statusEl.textContent, 'error');
       }
     });
 
@@ -1593,6 +1644,25 @@
         btn.textContent = '注销中...';
         PluginSDK.sendAction('deactivate_license');
       }
+    }
+
+    function checkPluginUpdate() {
+      const btn = document.getElementById('btnCheckUpdate');
+      btn.disabled = true;
+      btn.textContent = '检查中...';
+      document.getElementById('updateStatusText').textContent = '正在检查 GitHub 更新...';
+      PluginSDK.sendAction('check_plugin_update');
+    }
+
+    function installPluginUpdate() {
+      if (!confirm('确定要更新 main.py 和 ui 文件夹吗？更新前会自动备份，完成后需要重启字字动画。')) {
+        return;
+      }
+      const btn = document.getElementById('btnInstallUpdate');
+      btn.disabled = true;
+      btn.textContent = '更新中...';
+      document.getElementById('updateStatusText').textContent = '正在下载并安装更新...';
+      PluginSDK.sendAction('install_plugin_update', { zip_url: _latestUpdateZipUrl || '' });
     }
   </script>
 </body>
