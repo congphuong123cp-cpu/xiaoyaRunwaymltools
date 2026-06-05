@@ -74,7 +74,7 @@ _LOG_FILE = plugin_dir / "runwayml_plugin_debug.log"
 _ENV_LOGGED = False
 _TASK_TAG = ""
 _LOG_ROTATE_BYTES = 20 * 1024 * 1024
-_PLUGIN_VERSION = "2026.06.06.1"
+_PLUGIN_VERSION = "2026.06.06.2"
 _UPDATE_REPO = "congphuong123cp-cpu/xiaoyaRunwaymltools"
 _UPDATE_VERSION_URL = f"https://raw.githubusercontent.com/{_UPDATE_REPO}/main/version.json"
 _UPDATE_ARCHIVE_URL = f"https://github.com/{_UPDATE_REPO}/archive/refs/heads/main.zip"
@@ -8773,7 +8773,7 @@ def get_info():
         "name": "小鸭快跑RunwayML视频插件",
         "version": "1.0.0",
         "author": "ZZDH",
-        "description": "RunwayML 视频生成插件，支持 API 和 Playwright 两种模式。\n支持图生视频、文生视频、视频生视频。",
+        "description": "",
     }
 
 

@@ -1,5 +1,5 @@
 {
-  "version": "2026.06.06.1",
+  "version": "2026.06.06.2",
   "zip_url": "https://github.com/congphuong123cp-cpu/xiaoyaRunwaymltools/archive/refs/heads/main.zip",
-  "notes": "只更新 main.py 和 ui 文件夹；修复 Seedance 2.0 流程、多账号调度、下载回收和 Smart Arrange。"
+  "notes": "清空插件外层描述信息，只保留插件名称；继续只更新 main.py 和 ui 文件夹。"
 }
