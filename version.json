@@ -1,5 +1,5 @@
 {
-  "version": "2026.06.06.4",
+  "version": "2026.06.06.5",
   "zip_url": "https://github.com/congphuong123cp-cpu/xiaoyaRunwaymltools/archive/refs/heads/main.zip",
-  "notes": "新增在线授权兼容逻辑，更新器支持同步授权模块，并保持旧机器码授权兼容。"
+  "notes": "发布包装版 main.py 与授权模块，兼容旧机器码授权和新版在线通用码。"
 }
