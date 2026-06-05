@@ -1,5 +1,5 @@
 {
-  "version": "2026.06.06.3",
+  "version": "2026.06.06.4",
   "zip_url": "https://github.com/congphuong123cp-cpu/xiaoyaRunwaymltools/archive/refs/heads/main.zip",
-  "notes": "调整页面标签名称：运行与账号改为账号管理，生成与高级配置改为参数配置。"
+  "notes": "新增在线授权兼容逻辑，更新器支持同步授权模块，并保持旧机器码授权兼容。"
 }

@@ -1,10 +1,17 @@
 __pycache__/
 *.pyc
 layout_test_shots/
+local_backups/
+tools/
+build/
+dist/
+*.spec
 *.mp4
 *.png
 *.json
 !version.json
 *.dat
+*.pem
+tools/outputs/
 runwayml_api_keys.txt
 runwayml_plugin_config.json

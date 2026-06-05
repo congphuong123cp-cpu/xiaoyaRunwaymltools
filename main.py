@@ -74,7 +74,7 @@ _LOG_FILE = plugin_dir / "runwayml_plugin_debug.log"
 _ENV_LOGGED = False
 _TASK_TAG = ""
 _LOG_ROTATE_BYTES = 20 * 1024 * 1024
-_PLUGIN_VERSION = "2026.06.06.3"
+_PLUGIN_VERSION = "2026.06.06.4"
 _UPDATE_REPO = "congphuong123cp-cpu/xiaoyaRunwaymltools"
 _UPDATE_VERSION_URL = f"https://raw.githubusercontent.com/{_UPDATE_REPO}/main/version.json"
 _UPDATE_ARCHIVE_URL = f"https://github.com/{_UPDATE_REPO}/archive/refs/heads/main.zip"
@@ -9059,6 +9059,7 @@ def _install_plugin_update(zip_url: str = "") -> dict[str, Any]:
     plugin_root = Path(_PLUGIN_FILE).resolve().parent
     current_main = plugin_root / "main.py"
     current_ui = plugin_root / "ui"
+    current_sec = plugin_root / "runway_sec.py"
     if not current_main.is_file():
         raise FileNotFoundError(f"当前 main.py 不存在: {current_main}")
     if not current_ui.is_dir():
@@ -9081,23 +9082,30 @@ def _install_plugin_update(zip_url: str = "") -> dict[str, Any]:
         package_root = _safe_extract_update_zip(zip_path, extract_dir)
         new_main = package_root / "main.py"
         new_ui = package_root / "ui"
+        new_sec = package_root / "runway_sec.py"
         if not new_main.is_file() or not new_ui.is_dir():
             raise ValueError("更新包校验失败: 缺少 main.py 或 ui/")
 
         shutil.copy2(str(current_main), str(backup_root / "main.py"))
         shutil.copytree(str(current_ui), str(backup_root / "ui"))
+        updated_files = ["main.py", "ui/"]
+        if current_sec.is_file():
+            shutil.copy2(str(current_sec), str(backup_root / "runway_sec.py"))
 
         shutil.copy2(str(new_main), str(current_main))
         if current_ui.exists():
             shutil.rmtree(str(current_ui))
         shutil.copytree(str(new_ui), str(current_ui))
+        if new_sec.is_file():
+            shutil.copy2(str(new_sec), str(current_sec))
+            updated_files.append("runway_sec.py")
 
         _log(f"plugin updater: installed update from {zip_url}, backup={backup_root}")
         return {
             "ok": True,
             "message": "更新完成，请重启字字动画后生效",
             "backup_dir": str(backup_root),
-            "updated": ["main.py", "ui/"],
+            "updated": updated_files,
         }
     except Exception:
         _log_exc("plugin updater failed")
