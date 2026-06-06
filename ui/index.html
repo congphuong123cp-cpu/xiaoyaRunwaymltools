@@ -731,6 +731,7 @@
         <div class="input-group">
           <input type="text" id="accountPoolPath" placeholder="D:/accounts.txt">
           <button class="btn-secondary" id="btnBrowse" onclick="browsePoolFile()">📂 选择</button>
+          <input type="file" id="accountPoolFileInput" accept=".txt,text/plain" style="display: none;">
         </div>
       </div>
       <div style="display: flex; gap: 8px;">
@@ -1019,7 +1020,7 @@
 
       <div style="display: flex; gap: 8px;">
         <button class="btn-success" id="btnActivate" onclick="activateLicense()">✨ 激活授权</button>
-        <button class="btn-secondary" id="btnDeactivate" onclick="deactivateLicense()">🔓 注销授权</button>
+        <button class="btn-secondary" onclick="openOnlineShop()">🛒 在线商城</button>
       </div>
 
       <div class="form-row" style="margin-top: 16px;">
@@ -1030,7 +1031,10 @@
       </div>
       <div style="display: flex; gap: 8px;">
         <button class="btn-secondary" id="btnCheckUpdate" onclick="checkPluginUpdate()">检查更新</button>
-        <button class="btn-success" id="btnInstallUpdate" onclick="installPluginUpdate()">一键更新 main.py + ui/</button>
+        <button class="btn-success" id="btnInstallUpdate" onclick="installPluginUpdate()">一键更新</button>
+      </div>
+      <div style="margin-top: 12px; display: flex; justify-content: flex-end;">
+        <button class="btn-secondary" id="btnDeactivate" onclick="deactivateLicense()" style="padding: 4px 8px; font-size: 12px; opacity: 0.55;">高级操作：注销授权</button>
       </div>
     </div>
   </div>
@@ -1297,7 +1301,7 @@
 
     PluginSDK.onAction('deactivate_license', function (data) {
       document.getElementById('btnDeactivate').disabled = false;
-      document.getElementById('btnDeactivate').textContent = '🔓 注销授权';
+      document.getElementById('btnDeactivate').textContent = '高级操作：注销授权';
       if (data && data.ok) {
         showToast(data.message || '注销成功', 'success');
         PluginSDK.sendAction('check_license_status');
@@ -1332,7 +1336,7 @@
       const btn = document.getElementById('btnInstallUpdate');
       const statusEl = document.getElementById('updateStatusText');
       btn.disabled = false;
-      btn.textContent = '一键更新 main.py + ui/';
+      btn.textContent = '一键更新';
       if (data && data.ok) {
         statusEl.textContent = data.message || '更新完成，请重启字字动画后生效';
         showToast(statusEl.textContent, 'success');
@@ -1413,6 +1417,19 @@
         updateStats();
       } else {
         showToast((data && data.error) ? data.error : '未能选择文件', 'error');
+      }
+    });
+
+    PluginSDK.onAction('import_account_pool_text', function (data) {
+      const fileInput = document.getElementById('accountPoolFileInput');
+      if (fileInput) fileInput.value = '';
+      if (data && data.ok) {
+        document.getElementById('accountPoolPath').value = data.path;
+        showToast(data.message || '账号池导入成功！', 'success');
+        PluginSDK.sendAction('reload_accounts', { silent: true, account_pool_path: data.path });
+        updateStats();
+      } else {
+        showToast((data && data.error) ? data.error : '账号池导入失败', 'error');
       }
     });
 
@@ -1514,7 +1531,12 @@
     // UI HANDLERS
     // ----------------------------------------------------
     function browsePoolFile() {
-      PluginSDK.sendAction('browse_pool_file');
+      const input = document.getElementById('accountPoolFileInput');
+      if (input) {
+        input.click();
+      } else {
+        PluginSDK.sendAction('browse_pool_file');
+      }
     }
 
     function currentPoolPath() {
@@ -1646,6 +1668,10 @@
       }
     }
 
+    function openOnlineShop() {
+      window.open('https://pay.ldxp.cn/shop/SXM6388U', '_blank');
+    }
+
     function checkPluginUpdate() {
       const btn = document.getElementById('btnCheckUpdate');
       btn.disabled = true;
@@ -1655,7 +1681,7 @@
     }
 
     function installPluginUpdate() {
-      if (!confirm('确定要更新 main.py 和 ui 文件夹吗？更新前会自动备份，完成后需要重启字字动画。')) {
+      if (!confirm('确定要更新插件吗？更新前会自动备份，完成后需要重启字字动画。')) {
         return;
       }
       const btn = document.getElementById('btnInstallUpdate');
@@ -1663,6 +1689,31 @@
       btn.textContent = '更新中...';
       document.getElementById('updateStatusText').textContent = '正在下载并安装更新...';
       PluginSDK.sendAction('install_plugin_update', { zip_url: _latestUpdateZipUrl || '' });
+    }
+
+    const accountPoolFileInput = document.getElementById('accountPoolFileInput');
+    if (accountPoolFileInput) {
+      accountPoolFileInput.addEventListener('change', function () {
+        const file = this.files && this.files[0];
+        if (!file) return;
+        if (!file.name.toLowerCase().endsWith('.txt')) {
+          showToast('请选择 TXT 文本文件', 'error');
+          this.value = '';
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = function () {
+          PluginSDK.sendAction('import_account_pool_text', {
+            name: file.name,
+            text: String(reader.result || '')
+          });
+        };
+        reader.onerror = function () {
+          showToast('读取账号池文本失败', 'error');
+          accountPoolFileInput.value = '';
+        };
+        reader.readAsText(file, 'utf-8');
+      });
     }
   </script>
 </body>

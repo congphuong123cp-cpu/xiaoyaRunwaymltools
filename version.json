@@ -1,5 +1,5 @@
 {
-  "version": "2026.06.06.6",
+  "version": "2026.06.06.7",
   "zip_url": "https://github.com/congphuong123cp-cpu/xiaoyaRunwaymltools/archive/refs/heads/main.zip",
-  "notes": "增强多点授权验证，关键生成、调度、浏览器和下载路径都会进行授权 gate。"
+  "notes": "修复账号池 TXT 手动导入，优化授权页按钮和本地授权管理页到期天数显示。"
 }
