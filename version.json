@@ -1,5 +1,5 @@
 {
-  "version": "2026.06.06.8",
+  "version": "2026.06.06.9",
   "zip_url": "https://github.com/congphuong123cp-cpu/xiaoyaRunwaymltools/archive/refs/heads/main.zip",
-  "notes": "优化新装或登录状态失效时的登录识别：先等待页面确认状态，必要时再进入登录页兜底。"
+  "notes": "授权页到期时间增加剩余天数高亮显示，并增强在线商城按钮识别度。"
 }

@@ -470,6 +470,17 @@
       box-shadow: 0 6px 15px rgba(0, 245, 212, 0.35);
     }
 
+    button.btn-shop {
+      background: linear-gradient(135deg, #ffcc33 0%, #ff7a1a 48%, #ff2f87 100%);
+      color: #140711;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      box-shadow: 0 5px 16px rgba(255, 122, 26, 0.34);
+    }
+
+    button.btn-shop:hover {
+      box-shadow: 0 8px 22px rgba(255, 47, 135, 0.42);
+    }
+
     button.btn-icon {
       padding: 6px;
       border-radius: 4px;
@@ -551,6 +562,27 @@
     .lic-info-val {
       font-weight: 500;
       color: #fff;
+    }
+
+    .lic-expiry-wrap {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .lic-expiry-days {
+      color: var(--accent-cyan);
+      font-weight: 800;
+      text-shadow: 0 0 12px rgba(0, 245, 212, 0.32);
+    }
+
+    .lic-expiry-days.warn {
+      color: #ffd166;
+      text-shadow: 0 0 12px rgba(255, 209, 102, 0.28);
+    }
+
+    .lic-expiry-date {
+      color: rgba(255, 255, 255, 0.9);
     }
 
     .lic-code-box {
@@ -1020,7 +1052,7 @@
 
       <div style="display: flex; gap: 8px;">
         <button class="btn-success" id="btnActivate" onclick="activateLicense()">✨ 激活授权</button>
-        <button class="btn-secondary" onclick="openOnlineShop()">🛒 在线商城</button>
+        <button class="btn-shop" onclick="openOnlineShop()">🛒 在线商城</button>
       </div>
 
       <div class="form-row" style="margin-top: 16px;">
@@ -1264,6 +1296,32 @@
     setInterval(updateStats, 1500);
     setInterval(pollLogs, 2000);
 
+    function setLicenseExpiry(expiryEl, data) {
+      if (!expiryEl) return;
+      expiryEl.textContent = '';
+      const expiryText = data.expiry_text || '-';
+      const expiresAt = Number(data.expires_at || 0);
+      const isPermanent = data.is_permanent || expiryText.indexOf('永久') >= 0;
+      if (!data.is_valid || !expiresAt || isPermanent) {
+        expiryEl.textContent = expiryText;
+        return;
+      }
+
+      const secondsLeft = expiresAt - Math.floor(Date.now() / 1000);
+      const daysLeft = Math.ceil(secondsLeft / 86400);
+      const wrap = document.createElement('span');
+      wrap.className = 'lic-expiry-wrap';
+      const days = document.createElement('span');
+      days.className = 'lic-expiry-days' + (daysLeft <= 7 ? ' warn' : '');
+      days.textContent = daysLeft > 0 ? ('剩余 ' + daysLeft + ' 天') : '已过期';
+      const date = document.createElement('span');
+      date.className = 'lic-expiry-date';
+      date.textContent = expiryText;
+      wrap.appendChild(days);
+      wrap.appendChild(date);
+      expiryEl.appendChild(wrap);
+    }
+
     // ----------------------------------------------------
     // ACTION CALLBACKS
     // ----------------------------------------------------
@@ -1274,14 +1332,14 @@
         const expiryEl = document.getElementById('licExpiry');
         
         statusEl.textContent = data.status_text || '未激活';
-        expiryEl.textContent = data.expiry_text || '-';
+        setLicenseExpiry(expiryEl, data);
         
         if (data.is_valid) {
           statusEl.className = 'status-badge success';
         } else {
           statusEl.className = 'status-badge danger';
           if (data.error) {
-            expiryEl.textContent = data.expiry_text + ' (' + data.error + ')';
+            expiryEl.textContent = (data.expiry_text || '-') + ' (' + data.error + ')';
           }
         }
       }
