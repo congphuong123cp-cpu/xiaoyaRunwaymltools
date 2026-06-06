@@ -1,5 +1,5 @@
 {
-  "version": "2026.06.06.9",
+  "version": "2026.06.06.10",
   "zip_url": "https://github.com/congphuong123cp-cpu/xiaoyaRunwaymltools/archive/refs/heads/main.zip",
-  "notes": "授权页到期时间增加剩余天数高亮显示，并增强在线商城按钮识别度。"
+  "notes": "修复生成结果轮询阶段跳转守卫未正常执行的问题，并自动关闭外部弹出页。"
 }
