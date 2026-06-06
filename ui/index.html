@@ -988,6 +988,17 @@
 
       <div class="switch-container">
         <div class="switch-label">
+          慢网络稳定模式
+          <p>在画幅、时长、上传、提示词和生成等关键步骤前加入短等待；任务成功后通道等待 1-2 分钟再释放。</p>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="stabilityModeCheckbox">
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="switch-container">
+        <div class="switch-label">
           异常保存截图
           <p>当任务报错或卡死时，自动保存当时网页截图以供分析</p>
         </div>
@@ -1211,6 +1222,9 @@
     document.getElementById('smartArrangeCheckbox').addEventListener('change', function() {
       save('smart_arrange', this.checked);
     });
+    document.getElementById('stabilityModeCheckbox').addEventListener('change', function() {
+      save('slow_network_stability_mode', this.checked);
+    });
     document.getElementById('screenshotCheckbox').addEventListener('change', function() {
       save('debug_save_screenshot', this.checked);
     });
@@ -1269,13 +1283,14 @@
       setCheckbox('keepBrowserCheckbox', false, false);
       document.getElementById('keepBrowserCheckbox').disabled = true;
       setCheckbox('smartArrangeCheckbox', params.smart_arrange, false);
+      setCheckbox('stabilityModeCheckbox', params.slow_network_stability_mode, false);
       setCheckbox('screenshotCheckbox', params.debug_save_screenshot, true);
       setCheckbox('autoSwitchCheckbox', params.auto_switch_account, true);
       setCheckbox('paidOnlyCheckbox', params.use_paid_accounts, false);
 
       // Perform initial actions
       PluginSDK.sendAction('check_license_status');
-      PluginSDK.sendAction('reload_accounts', { silent: true, account_pool_path: currentPoolPath() });
+      PluginSDK.sendAction('reload_accounts', { silent: true, account_pool_path: currentPoolPath(), source: 'ui_onready' });
       updateStats();
       pollLogs();
     });
@@ -1507,13 +1522,21 @@
       }
     });
 
+    let shutdownForceUntil = 0;
+
     PluginSDK.onAction('shutdown_browsers', function (data) {
       document.getElementById('btnShutdown').disabled = false;
       document.getElementById('btnShutdown').textContent = '🛑 关闭所有浏览器';
       if (data && data.ok) {
+        shutdownForceUntil = 0;
         showToast(data.message || '浏览器已关闭', 'success');
         updateStats();
       } else {
+        if (data && data.requires_force) {
+          shutdownForceUntil = Date.now() + 10000;
+          const btn = document.getElementById('btnShutdown');
+          btn.textContent = '⚠️ 再次点击强制关闭';
+        }
         showToast((data && data.error) ? data.error : '操作失败', 'error');
       }
     });
@@ -1603,7 +1626,7 @@
     }
 
     function reloadAccounts() {
-      PluginSDK.sendAction('reload_accounts', { account_pool_path: currentPoolPath() });
+      PluginSDK.sendAction('reload_accounts', { account_pool_path: currentPoolPath(), source: 'ui_reload_button' });
     }
 
     function addAccount() {
@@ -1654,8 +1677,9 @@
     function triggerShutdown() {
       const btn = document.getElementById('btnShutdown');
       btn.disabled = true;
-      btn.textContent = '🧹 正在取消排队并关闭...';
-      PluginSDK.sendAction('shutdown_browsers');
+      const force = Date.now() < shutdownForceUntil;
+      btn.textContent = force ? '正在强制关闭...' : '正在检查任务状态...';
+      PluginSDK.sendAction('shutdown_browsers', { force: force, source: 'ui_shutdown_button' });
     }
 
     let diagnoseResetTimer = null;
@@ -1674,7 +1698,7 @@
         diagnoseResetTimer = null;
         showToast('诊断响应超时，已恢复按钮，请查看日志确认后台状态', 'error');
       }, 20000);
-      PluginSDK.sendAction('diagnose_and_wakeup');
+      PluginSDK.sendAction('diagnose_and_wakeup', { source: 'ui_diagnose_button' });
     }
 
     function clearLogs() {
@@ -1739,14 +1763,20 @@
     }
 
     function installPluginUpdate() {
-      if (!confirm('确定要更新插件吗？更新前会自动备份，完成后需要重启字字动画。')) {
-        return;
-      }
       const btn = document.getElementById('btnInstallUpdate');
+      const statusEl = document.getElementById('updateStatusText');
       btn.disabled = true;
       btn.textContent = '更新中...';
-      document.getElementById('updateStatusText').textContent = '正在下载并安装更新...';
-      PluginSDK.sendAction('install_plugin_update', { zip_url: _latestUpdateZipUrl || '' });
+      statusEl.textContent = '正在下载并安装更新...';
+      showToast('已开始更新，完成后会提示重启字字动画', 'success');
+      try {
+        PluginSDK.sendAction('install_plugin_update', { zip_url: _latestUpdateZipUrl || '' });
+      } catch (err) {
+        btn.disabled = false;
+        btn.textContent = '一键更新';
+        statusEl.textContent = '更新失败：' + (err && err.message ? err.message : err);
+        showToast(statusEl.textContent, 'error');
+      }
     }
 
     const accountPoolFileInput = document.getElementById('accountPoolFileInput');

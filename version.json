@@ -1,5 +1,5 @@
 {
-  "version": "2026.06.06.10",
+  "version": "2026.06.06.15",
   "zip_url": "https://github.com/congphuong123cp-cpu/xiaoyaRunwaymltools/archive/refs/heads/main.zip",
-  "notes": "修复生成结果轮询阶段跳转守卫未正常执行的问题，并自动关闭外部弹出页。"
+  "notes": "新增慢网络稳定模式开关：开启后在画幅、时长、上传、提示词和生成等关键步骤前加入最多 2.5 秒短等待；任务成功后通道等待 1-2 分钟再释放，降低慢网络下控件未响应或上传确认滞后的概率。"
 }
