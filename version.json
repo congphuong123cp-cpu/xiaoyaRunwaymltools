@@ -1,5 +1,5 @@
 {
-  "version": "2026.06.06.7",
+  "version": "2026.06.06.8",
   "zip_url": "https://github.com/congphuong123cp-cpu/xiaoyaRunwaymltools/archive/refs/heads/main.zip",
-  "notes": "修复账号池 TXT 手动导入，优化授权页按钮和本地授权管理页到期天数显示。"
+  "notes": "优化新装或登录状态失效时的登录识别：先等待页面确认状态，必要时再进入登录页兜底。"
 }
