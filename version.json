@@ -1,5 +1,5 @@
 {
-  "version": "2026.06.07.02",
+  "version": "2026.06.07.04",
   "zip_url": "https://github.com/congphuong123cp-cpu/xiaoyaRunwaymltools/archive/refs/heads/main.zip",
-  "notes": "智能排列进一步优化：按启用账号数自动使用 2/3/4 列布局，同账号多任务上下排列，不同账号横向均匀展开；保留授权兼容、pw_slot 初始化修复和慢网络稳定模式。"
+  "notes": "修复 Runway usage policy / account suspension 提示被 credits refunded 误过滤导致任务卡死的问题；优化 GitHub 更新 403/404/401 错误提示；插件更新请求改为直连 GitHub，不读取系统代理环境变量；新增标签页切换时防浏览器误关闭的保护守卫。"
 }
