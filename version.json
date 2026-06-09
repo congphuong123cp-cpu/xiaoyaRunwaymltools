@@ -1,5 +1,5 @@
 {
-  "version": "2026.06.07.04",
+  "version": "2026.06.10.01",
   "zip_url": "https://github.com/congphuong123cp-cpu/xiaoyaRunwaymltools/archive/refs/heads/main.zip",
-  "notes": "修复 Runway usage policy / account suspension 提示被 credits refunded 误过滤导致任务卡死的问题；优化 GitHub 更新 403/404/401 错误提示；插件更新请求改为直连 GitHub，不读取系统代理环境变量；新增标签页切换时防浏览器误关闭的保护守卫。"
+  "notes": "优化 Runway 提示词违规与页面活动状态判定逻辑，修复误判与视频提取被阻断问题。"
 }
