@@ -1,5 +1,5 @@
 {
-  "version": "2026.06.10.02",
+  "version": "2026.06.15.01",
   "zip_url": "https://github.com/congphuong123cp-cpu/xiaoyaRunwaymltools/archive/refs/heads/main.zip",
-  "notes": "绑定当前任务的视频/任务ID以防误关闭浏览器，确保在 polling 期间或浏览其他页面时不会误判提示词违规错误。"
+  "notes": "新增支持下载视频时文件名前缀带上字字动画分镜序号（如0001_前缀）；绑定当前任务的视频/任务ID以防误关闭浏览器，确保在 polling 期间或浏览其他页面时不会误判提示词违规错误。"
 }
